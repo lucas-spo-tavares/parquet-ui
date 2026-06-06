@@ -70,6 +70,10 @@ function createVirtualParquetPath() {
   return `parquet-ui-${crypto.randomUUID()}.parquet`;
 }
 
+function createVirtualExportParquetPath() {
+  return `parquet-ui-export-${crypto.randomUUID()}.parquet`;
+}
+
 function sqlString(value: string) {
   return value.replace(/'/g, "''");
 }
@@ -137,6 +141,21 @@ export async function runDuckDbQuery(sql: string): Promise<QueryResult> {
       truncated,
     };
   } finally {
+    await conn.close();
+  }
+}
+
+export async function exportDuckDbQueryToParquet(sql: string): Promise<Uint8Array> {
+  const db = await getDb();
+  const conn = await db.connect();
+  const exportPath = createVirtualExportParquetPath();
+  const cleanedSql = cleanSql(sql);
+
+  try {
+    await conn.query(`COPY (${cleanedSql}) TO '${sqlString(exportPath)}' (FORMAT PARQUET)`);
+    return await db.copyFileToBuffer(exportPath);
+  } finally {
+    await db.dropFile(exportPath).catch(() => undefined);
     await conn.close();
   }
 }

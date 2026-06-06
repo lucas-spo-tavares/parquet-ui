@@ -180,7 +180,6 @@ Essas variaveis documentam o deploy. Elas nao devem conter credenciais AWS.
 ## Roadmap futuro
 
 - Comparacao entre arquivos Parquet.
-- Exportacao de resultado de query para Parquet.
 - Exportacao de dashboard como imagem.
 - Persistencia local via IndexedDB.
 - Suporte a arquivos Parquet remotos via URL publica.

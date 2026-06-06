@@ -1,6 +1,15 @@
 import { displayValue } from "@/lib/formatters/formatters";
 import type { DataRow } from "@/types";
 
+export function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function rowsToCsv(rows: DataRow[], columns?: string[]) {
   const headers = columns ?? Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   const escapeCell = (value: string) => {
@@ -16,11 +25,5 @@ export function rowsToCsv(rows: DataRow[], columns?: string[]) {
 
 export function downloadCsv(filename: string, rows: DataRow[], columns?: string[]) {
   const csv = rowsToCsv(rows, columns);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(filename, new Blob([csv], { type: "text/csv;charset=utf-8" }));
 }

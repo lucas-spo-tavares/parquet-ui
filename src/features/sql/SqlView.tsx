@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, CircleHelp, Download, Loader2, Play, Plus, RotateCcw, X } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleHelp, Download, FileArchive, Loader2, Play, Plus, RotateCcw, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
 import { Alert } from "@/components/ui/alert";
@@ -8,8 +8,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { downloadCsv } from "@/lib/export/csv";
-import { runDuckDbQuery } from "@/lib/duckdb/client";
+import { downloadBlob, downloadCsv } from "@/lib/export/csv";
+import { exportDuckDbQueryToParquet, runDuckDbQuery } from "@/lib/duckdb/client";
 import type { UploadedParquetFile } from "@/types";
 import { useSqlStore } from "./store/sqlStore";
 
@@ -60,6 +60,7 @@ FROM ${primaryAlias};`,
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const [closingTabId, setClosingTabId] = useState<string>();
+  const [exportingParquetTabId, setExportingParquetTabId] = useState<string>();
   const [runningTabId, setRunningTabId] = useState<string>();
 
   if (!activeTab) {
@@ -69,6 +70,7 @@ FROM ${primaryAlias};`,
   const canRun = files.length > 0 && duckDbStatus === "ready" && runningTabId !== activeTab.id;
   const isRunning = runningTabId === activeTab.id;
   const closingTab = tabs.find((tab) => tab.id === closingTabId);
+  const isExportingParquet = exportingParquetTabId === activeTab.id;
 
   const run = async () => {
     if (!canRun) return;
@@ -85,6 +87,20 @@ FROM ${primaryAlias};`,
       setQueryResult(tabId, undefined);
     } finally {
       setRunningTabId((current) => (current === tabId ? undefined : current));
+    }
+  };
+
+  const exportParquet = async () => {
+    const tabId = activeTab.id;
+    setExportingParquetTabId(tabId);
+    try {
+      const parquetBuffer = await exportDuckDbQueryToParquet(activeTab.sql);
+      const blobBuffer = new Uint8Array(parquetBuffer);
+      downloadBlob(`${activeTab.name}.parquet`, new Blob([blobBuffer], { type: "application/octet-stream" }));
+    } catch (error) {
+      setQueryError(tabId, { message: error instanceof Error ? error.message : "Erro ao exportar Parquet." });
+    } finally {
+      setExportingParquetTabId((current) => (current === tabId ? undefined : current));
     }
   };
 
@@ -191,15 +207,26 @@ FROM ${primaryAlias};`,
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Resultado</CardTitle>
-          <Button
-            disabled={!activeTab.result?.rows.length}
-            onClick={() => activeTab.result && downloadCsv(`${activeTab.name}.csv`, activeTab.result.rows, activeTab.result.columns)}
-            type="button"
-            variant="outline"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              disabled={isExportingParquet || duckDbStatus !== "ready" || !activeTab.result?.rows.length}
+              onClick={() => void exportParquet()}
+              type="button"
+              variant="outline"
+            >
+              {isExportingParquet ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
+              Export Parquet
+            </Button>
+            <Button
+              disabled={!activeTab.result?.rows.length}
+              onClick={() => activeTab.result && downloadCsv(`${activeTab.name}.csv`, activeTab.result.rows, activeTab.result.columns)}
+              type="button"
+              variant="outline"
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="min-w-0">
           {!activeTab.result ? (
