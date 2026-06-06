@@ -9,6 +9,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { DashboardView } from "./features/dashboard/DashboardView";
 import { PreviewView } from "./features/preview/PreviewView";
@@ -260,6 +261,19 @@ function App() {
               <Download className="h-4 w-4" />
               {isStandalone ? "App instalado" : "Instalar PWA"}
             </Button>
+            {activeFile && (
+              <Alert>
+                <div className="space-y-1 text-sm">
+                  <div>
+                    Arquivo ativo: <strong>{activeFile.sqlAlias}</strong>
+                  </div>
+                  <div className="truncate text-muted-foreground" title={activeFile.name}>
+                    {activeFile.name}
+                  </div>
+                  <div className="text-muted-foreground">Schema, Preview e Profiling usam esse parquet.</div>
+                </div>
+              </Alert>
+            )}
           </div>
         </aside>
 

@@ -1,10 +1,11 @@
-import { Download, Loader2, Play, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleHelp, Download, Loader2, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { Dialog } from "@/components/ui/dialog";
 import { downloadCsv } from "@/lib/export/csv";
 import { runDuckDbQuery } from "@/lib/duckdb/client";
 import type { QueryError, QueryResult, UploadedParquetFile } from "@/types";
@@ -20,22 +21,33 @@ export function SqlView({ file, files, duckDbStatus, onQueryResult }: SqlViewPro
   const primaryAlias = files[0]?.sqlAlias ?? "data1";
   const suggestions = useMemo(
     () => [
-      `SELECT *
+      {
+        label: `Preview de ${primaryAlias}`,
+        sql: `SELECT *
 FROM ${primaryAlias}
 LIMIT 100;`,
-      `DESCRIBE ${primaryAlias};`,
-      `SELECT COUNT(*) AS total_rows
+      },
+      {
+        label: `Schema de ${primaryAlias}`,
+        sql: `DESCRIBE ${primaryAlias};`,
+      },
+      {
+        label: `Contagem de ${primaryAlias}`,
+        sql: `SELECT COUNT(*) AS total_rows
 FROM ${primaryAlias};`,
+      },
     ],
     [primaryAlias],
   );
-  const [sql, setSql] = useState(suggestions[0]);
+  const [sql, setSql] = useState(suggestions[0].sql);
   const [result, setResult] = useState<QueryResult>();
   const [queryError, setQueryError] = useState<QueryError>();
   const [running, setRunning] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [queryOpen, setQueryOpen] = useState(true);
 
   useEffect(() => {
-    setSql((current) => (current.trim() ? current : suggestions[0]));
+    setSql((current) => (current.trim() ? current : suggestions[0].sql));
   }, [suggestions]);
 
   const canRun = Boolean(file) && duckDbStatus === "ready" && !running;
@@ -63,19 +75,15 @@ FROM ${primaryAlias};`,
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[0.95fr_1.35fr]">
+    <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>SQL local</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <textarea
-            className="min-h-[260px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-            onChange={(event) => setSql(event.target.value)}
-            spellCheck={false}
-            value={sql}
-          />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setQueryOpen((current) => !current)} type="button" variant="outline">
+              {queryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {queryOpen ? "Recolher" : "Expandir"}
+            </Button>
             <Button disabled={!canRun} onClick={() => void run()} type="button">
               {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Run query
@@ -84,56 +92,82 @@ FROM ${primaryAlias};`,
               <RotateCcw className="h-4 w-4" />
               Clear
             </Button>
-            <Button disabled={!result?.rows.length} onClick={() => result && downloadCsv(`${file.name}-query.csv`, result.rows, result.columns)} type="button" variant="outline">
-              <Download className="h-4 w-4" />
-              Export CSV
+            <Button onClick={() => setHelpOpen(true)} type="button" variant="outline">
+              <CircleHelp className="h-4 w-4" />
+              Ajuda
             </Button>
           </div>
-          <div className="space-y-2">
-            {suggestions.map((suggestion) => (
-              <button
-                className="block w-full rounded-md border border-border bg-background p-3 text-left font-mono text-xs transition hover:bg-muted"
-                key={suggestion}
-                onClick={() => setSql(suggestion)}
-                type="button"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-          {duckDbStatus === "registering" && <Alert>Registrando aliases dos arquivos Parquet no DuckDB-WASM...</Alert>}
-          {duckDbStatus === "error" && <Alert className="border-destructive/30 bg-red-50 text-red-950">Nao foi possivel inicializar DuckDB-WASM para este arquivo.</Alert>}
+        </CardHeader>
+        {queryOpen && (
+          <CardContent className="space-y-4">
+            <textarea
+              className="min-h-[260px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
+              onChange={(event) => setSql(event.target.value)}
+              spellCheck={false}
+              value={sql}
+            />
+            {duckDbStatus === "registering" && <Alert>Registrando aliases dos arquivos Parquet no DuckDB-WASM...</Alert>}
+            {duckDbStatus === "error" && <Alert className="border-destructive/30 bg-red-50 text-red-950">Nao foi possivel inicializar DuckDB-WASM para este arquivo.</Alert>}
+          </CardContent>
+        )}
+      </Card>
+
+      {queryError && <Alert className="border-destructive/30 bg-red-50 text-red-950">{queryError.message}</Alert>}
+      {result?.truncated && <Alert>Resultado limitado a {MAX_QUERY_RESULT_ROWS} linhas para proteger a interface.</Alert>}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle>Resultado</CardTitle>
+          <Button disabled={!result?.rows.length} onClick={() => result && downloadCsv(`${file.name}-query.csv`, result.rows, result.columns)} type="button" variant="outline">
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </CardHeader>
+        <CardContent className="min-w-0">
+          {!result ? (
+            <div className="rounded-md border border-border p-8 text-sm text-muted-foreground">Execute uma query para ver os resultados.</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                <span>{result.rowCount.toLocaleString("pt-BR")} linha(s)</span>
+                <span>{result.executionMs.toFixed(1)} ms</span>
+              </div>
+              <DataTable columns={result.columns} rows={result.rows} pageSize={25} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        description="Atalhos rapidos para consultar os Parquets carregados."
+        onOpenChange={setHelpOpen}
+        open={helpOpen}
+        title="Ajuda SQL"
+      >
+        <div className="space-y-4 text-sm">
           {!!files.length && (
             <Alert>
               Alias disponiveis: {files.map((item) => item.sqlAlias).join(", ")}. Use esses nomes diretamente nas queries e joins entre Parquets.
             </Alert>
           )}
           <Alert>Queries rodam no navegador via DuckDB-WASM. Nenhum dado e enviado para backend.</Alert>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4">
-        {queryError && <Alert className="border-destructive/30 bg-red-50 text-red-950">{queryError.message}</Alert>}
-        {result?.truncated && <Alert>Resultado limitado a {MAX_QUERY_RESULT_ROWS} linhas para proteger a interface.</Alert>}
-        <Card>
-          <CardHeader>
-            <CardTitle>Resultado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!result ? (
-              <div className="rounded-md border border-border p-8 text-sm text-muted-foreground">Execute uma query para ver os resultados.</div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                  <span>{result.rowCount.toLocaleString("pt-BR")} linha(s)</span>
-                  <span>{result.executionMs.toFixed(1)} ms</span>
-                </div>
-                <DataTable columns={result.columns} rows={result.rows} pageSize={25} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          <div className="space-y-2">
+            <p className="font-medium">Exemplos uteis</p>
+            {suggestions.map((suggestion) => (
+              <button
+                className="block w-full rounded-md border border-border bg-background p-3 text-left font-mono text-xs transition hover:bg-muted"
+                key={suggestion.label}
+                onClick={() => {
+                  setSql(suggestion.sql);
+                  setHelpOpen(false);
+                }}
+                type="button"
+              >
+                {suggestion.sql}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
