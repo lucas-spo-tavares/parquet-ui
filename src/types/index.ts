@@ -70,11 +70,13 @@ export type ProfileResult = {
 };
 
 export type ChartType = "bar" | "line" | "pie";
-export type AggregationType = "count" | "sum" | "avg" | "min" | "max";
+export type AggregationType = "none" | "count" | "sum" | "avg" | "min" | "max";
 
 export type ChartConfig = {
   id: string;
   title: string;
+  sourceId: string;
+  sourceKind: "parquet" | "sql";
   type: ChartType;
   categoryColumn: string;
   metricColumn: string;

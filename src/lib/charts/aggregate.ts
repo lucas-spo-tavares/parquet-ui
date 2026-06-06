@@ -15,6 +15,20 @@ function sortCategories(rows: AggregatedChartRow[]) {
 }
 
 export function aggregateChartData(rows: DataRow[], config: ChartConfig): AggregatedChartRow[] {
+  if (config.aggregation === "none") {
+    const directRows = rows
+      .map((row) => {
+        const category = displayValue(row[config.categoryColumn]) || "(empty)";
+        const value = asNumber(row[config.metricColumn]);
+        if (value === null) return null;
+        return { category, value };
+      })
+      .filter((row): row is AggregatedChartRow => row !== null);
+
+    const sortedRows = config.type === "line" ? sortCategories(directRows) : directRows;
+    return sortedRows.slice(0, 50);
+  }
+
   const groups = new Map<string, number[]>();
 
   for (const row of rows) {

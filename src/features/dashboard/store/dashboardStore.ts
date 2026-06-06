@@ -2,30 +2,30 @@ import { create } from "zustand";
 import type { ChartConfig } from "@/types";
 
 type DashboardStore = {
-  chartsByFileId: Record<string, ChartConfig[]>;
-  upsertChart: (fileId: string, chart: ChartConfig) => void;
-  removeChart: (fileId: string, chartId: string) => void;
+  charts: ChartConfig[];
+  countChartsBySource: (sourceKind: ChartConfig["sourceKind"], sourceId: string) => number;
+  removeChartsBySource: (sourceKind: ChartConfig["sourceKind"], sourceId: string) => void;
+  upsertChart: (chart: ChartConfig) => void;
+  removeChart: (chartId: string) => void;
 };
 
-export const useDashboardStore = create<DashboardStore>((set) => ({
-  chartsByFileId: {},
-  upsertChart: (fileId, chart) =>
+export const useDashboardStore = create<DashboardStore>((set, get) => ({
+  charts: [],
+  countChartsBySource: (sourceKind, sourceId) => get().charts.filter((chart) => chart.sourceKind === sourceKind && chart.sourceId === sourceId).length,
+  removeChartsBySource: (sourceKind, sourceId) =>
+    set((state) => ({
+      charts: state.charts.filter((chart) => !(chart.sourceKind === sourceKind && chart.sourceId === sourceId)),
+    })),
+  upsertChart: (chart) =>
     set((state) => {
-      const charts = state.chartsByFileId[fileId] ?? [];
-      const exists = charts.some((item) => item.id === chart.id);
+      const exists = state.charts.some((item) => item.id === chart.id);
 
       return {
-        chartsByFileId: {
-          ...state.chartsByFileId,
-          [fileId]: exists ? charts.map((item) => (item.id === chart.id ? chart : item)) : [...charts, chart],
-        },
+        charts: exists ? state.charts.map((item) => (item.id === chart.id ? chart : item)) : [...state.charts, chart],
       };
     }),
-  removeChart: (fileId, chartId) =>
+  removeChart: (chartId) =>
     set((state) => ({
-      chartsByFileId: {
-        ...state.chartsByFileId,
-        [fileId]: (state.chartsByFileId[fileId] ?? []).filter((chart) => chart.id !== chartId),
-      },
+      charts: state.charts.filter((chart) => chart.id !== chartId),
     })),
 }));

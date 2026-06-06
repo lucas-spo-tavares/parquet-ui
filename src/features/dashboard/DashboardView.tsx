@@ -15,6 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useSqlStore } from "@/features/sql/store/sqlStore";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,37 +24,77 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { aggregateChartData } from "@/lib/charts/aggregate";
 import { downloadCsv } from "@/lib/export/csv";
-import type { AggregationType, ChartConfig, ChartType, QueryResult, UploadedParquetFile } from "@/types";
+import type { AggregationType, ChartConfig, ChartType, DataRow, UploadedParquetFile } from "@/types";
 import { useDashboardStore } from "./store/dashboardStore";
 
 const colors = ["#09090b", "#0f766e", "#2563eb", "#a16207", "#be123c", "#6d28d9", "#047857", "#b45309", "#64748b"];
-
-type DashboardViewProps = {
-  file?: UploadedParquetFile;
-  queryResult?: QueryResult;
-};
-
 const chartTypes: ChartType[] = ["bar", "line", "pie"];
-const aggregations: AggregationType[] = ["count", "sum", "avg", "min", "max"];
+const aggregations: AggregationType[] = ["none", "count", "sum", "avg", "min", "max"];
 const emptyCharts: ChartConfig[] = [];
 
-export function DashboardView({ file, queryResult }: DashboardViewProps) {
+type DashboardViewProps = {
+  files: UploadedParquetFile[];
+};
+
+type DashboardSource = {
+  columns: string[];
+  id: string;
+  kind: "parquet" | "sql";
+  label: string;
+  metricColumns: string[];
+  rows: DataRow[];
+};
+
+function getColumns(rows: DataRow[]) {
+  return Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+}
+
+function getMetricColumns(rows: DataRow[], columns: string[]) {
+  return columns.filter((column) => rows.some((row) => typeof row[column] === "number" || typeof row[column] === "bigint"));
+}
+
+export function DashboardView({ files }: DashboardViewProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string>();
-  const [source, setSource] = useState<"sample" | "query">("sample");
-  const charts = useDashboardStore((state) => (file ? state.chartsByFileId[file.id] ?? emptyCharts : emptyCharts));
+  const sqlTabs = useSqlStore((state) => state.tabs);
+  const charts = useDashboardStore((state) => state.charts ?? emptyCharts);
   const upsertChartInStore = useDashboardStore((state) => state.upsertChart);
   const removeChart = useDashboardStore((state) => state.removeChart);
 
-  const rows = useMemo(
-    () => (source === "query" && queryResult?.rows.length ? queryResult.rows : file?.sampleRows ?? []),
-    [file?.sampleRows, queryResult?.rows, source],
+  const sources = useMemo<DashboardSource[]>(
+    () => [
+      ...files.map((file) => {
+        const columns = getColumns(file.sampleRows);
+        return {
+          id: file.id,
+          kind: "parquet" as const,
+          label: `Parquet: ${file.sqlAlias}`,
+          columns,
+          metricColumns: getMetricColumns(file.sampleRows, columns),
+          rows: file.sampleRows,
+        };
+      }),
+      ...sqlTabs
+        .filter((tab) => tab.result?.rows.length)
+        .map((tab) => {
+          const rows = tab.result?.rows ?? [];
+          const columns = tab.result?.columns?.length ? tab.result.columns : getColumns(rows);
+          return {
+            id: tab.sourceId,
+            kind: "sql" as const,
+            label: `SQL: ${tab.name}`,
+            columns,
+            metricColumns: getMetricColumns(rows, columns),
+            rows,
+          };
+        }),
+    ],
+    [files, sqlTabs],
   );
-  const columns = useMemo(() => Array.from(new Set(rows.flatMap((row) => Object.keys(row)))), [rows]);
-  const numericColumns = useMemo(
-    () =>
-      columns.filter((column) => rows.some((row) => typeof row[column] === "number" || typeof row[column] === "bigint")),
-    [columns, rows],
+
+  const sourcesByKey = useMemo(
+    () => Object.fromEntries(sources.map((source) => [`${source.kind}:${source.id}`, source])),
+    [sources],
   );
 
   const openNew = () => {
@@ -62,13 +103,12 @@ export function DashboardView({ file, queryResult }: DashboardViewProps) {
   };
 
   const upsertChart = (config: ChartConfig) => {
-    if (!file) return;
-    upsertChartInStore(file.id, config);
+    upsertChartInStore(config);
     setDialogOpen(false);
     setEditingId(undefined);
   };
 
-  if (!file) {
+  if (!files.length) {
     return <Empty title="Dashboard" message="Carregue um arquivo .parquet para criar graficos." />;
   }
 
@@ -77,27 +117,15 @@ export function DashboardView({ file, queryResult }: DashboardViewProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">Graficos baseados em amostra ou no resultado atual da query.</p>
+          <p className="text-sm text-muted-foreground">Cada grafico escolhe sua propria fonte de dados: parquet ou query SQL salva.</p>
         </div>
-        <div className="flex gap-2">
-          <Select className="w-[220px]" onChange={(event) => setSource(event.target.value as "sample" | "query")} value={source}>
-            <option value="sample">Amostra do Parquet</option>
-            <option disabled={!queryResult?.rows.length} value="query">
-              Resultado SQL atual
-            </option>
-          </Select>
-          <Button disabled={!columns.length} onClick={openNew} type="button">
-            <Plus className="h-4 w-4" />
-            Adicionar grafico
-          </Button>
-        </div>
+        <Button disabled={!sources.length} onClick={openNew} type="button">
+          <Plus className="h-4 w-4" />
+          Adicionar grafico
+        </Button>
       </div>
 
-      <Alert>
-        {source === "sample"
-          ? "Graficos usam a amostra inicial do arquivo. Para agregacoes completas, execute uma query SQL agregada e use o resultado atual."
-          : "Graficos usam o resultado da ultima query SQL retornada pela tela SQL."}
-      </Alert>
+      <Alert>Graficos podem usar a amostra de qualquer parquet carregado ou o resultado salvo de uma aba SQL com dados disponiveis.</Alert>
 
       {!charts.length ? (
         <Card>
@@ -105,21 +133,25 @@ export function DashboardView({ file, queryResult }: DashboardViewProps) {
             <BarChart3 className="h-10 w-10 text-muted-foreground" />
             <div>
               <p className="font-medium">Nenhum grafico adicionado</p>
-              <p className="mt-1 text-sm text-muted-foreground">Configure barra, linha ou pizza a partir das colunas carregadas.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Configure barra, linha ou pizza a partir das fontes de dados disponiveis.</p>
             </div>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {charts.map((chart) => {
-            const data = aggregateChartData(rows, chart);
+            const source = sourcesByKey[`${chart.sourceKind}:${chart.sourceId}`];
+            const data = aggregateChartData(source?.rows ?? [], chart);
             return (
               <Card key={chart.id}>
                 <CardHeader className="flex flex-row items-start justify-between gap-3">
                   <div>
                     <CardTitle>{chart.title}</CardTitle>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {chart.aggregation} de {chart.metricColumn} por {chart.categoryColumn}
+                      {source?.label ?? "Fonte removida"} ·{" "}
+                      {chart.aggregation === "none"
+                        ? `${chart.metricColumn} por ${chart.categoryColumn}`
+                        : `${chart.aggregation} de ${chart.metricColumn} por ${chart.categoryColumn}`}
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -144,15 +176,19 @@ export function DashboardView({ file, queryResult }: DashboardViewProps) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button aria-label="Remover grafico" onClick={() => removeChart(file.id, chart.id)} size="icon" type="button" variant="ghost">
+                    <Button aria-label="Remover grafico" onClick={() => removeChart(chart.id)} size="icon" type="button" variant="ghost">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[320px]">
-                    <ChartRenderer config={chart} data={data} />
-                  </div>
+                  {!source ? (
+                    <Alert className="border-destructive/30 bg-red-50 text-red-950">A fonte deste grafico nao existe mais. Edite o grafico para escolher outra.</Alert>
+                  ) : (
+                    <div className="h-[320px]">
+                      <ChartRenderer config={chart} data={data} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -162,11 +198,10 @@ export function DashboardView({ file, queryResult }: DashboardViewProps) {
 
       <ChartDialog
         chart={charts.find((chart) => chart.id === editingId)}
-        columns={columns}
-        numericColumns={numericColumns}
         onOpenChange={setDialogOpen}
         onSubmit={upsertChart}
         open={dialogOpen}
+        sources={sources}
       />
     </div>
   );
@@ -222,41 +257,63 @@ function ChartRenderer({ config, data }: { config: ChartConfig; data: Array<{ ca
 
 function ChartDialog({
   chart,
-  columns,
-  numericColumns,
   open,
   onOpenChange,
   onSubmit,
+  sources,
 }: {
   chart?: ChartConfig;
-  columns: string[];
-  numericColumns: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (config: ChartConfig) => void;
+  sources: DashboardSource[];
 }) {
   const [title, setTitle] = useState(chart?.title ?? "Novo grafico");
+  const [sourceKey, setSourceKey] = useState("");
   const [type, setType] = useState<ChartType>(chart?.type ?? "bar");
-  const [categoryColumn, setCategoryColumn] = useState(chart?.categoryColumn ?? columns[0] ?? "");
-  const [metricColumn, setMetricColumn] = useState(chart?.metricColumn ?? numericColumns[0] ?? columns[0] ?? "");
+  const [categoryColumn, setCategoryColumn] = useState("");
+  const [metricColumn, setMetricColumn] = useState("");
   const [aggregation, setAggregation] = useState<AggregationType>(chart?.aggregation ?? "count");
+
+  const source = sources.find((item) => `${item.kind}:${item.id}` === sourceKey);
+  const columns = source?.columns ?? [];
+  const numericColumns = source?.metricColumns ?? [];
 
   useEffect(() => {
     if (!open) return;
 
+    const nextSource = chart ? sources.find((item) => item.id === chart.sourceId && item.kind === chart.sourceKind) : sources[0];
     setTitle(chart?.title ?? "Novo grafico");
+    setSourceKey(nextSource ? `${nextSource.kind}:${nextSource.id}` : "");
     setType(chart?.type ?? "bar");
-    setCategoryColumn(chart?.categoryColumn ?? columns[0] ?? "");
-    setMetricColumn(chart?.metricColumn ?? numericColumns[0] ?? columns[0] ?? "");
+    setCategoryColumn(chart?.categoryColumn ?? nextSource?.columns[0] ?? "");
+    setMetricColumn(chart?.metricColumn ?? nextSource?.metricColumns[0] ?? nextSource?.columns[0] ?? "");
     setAggregation(chart?.aggregation ?? "count");
-  }, [chart, columns, numericColumns, open]);
+  }, [chart, open, sources]);
+
+  useEffect(() => {
+    if (!source) return;
+    const nextColumns = source.columns;
+    const nextMetricColumns = aggregation === "count" ? nextColumns : source.metricColumns;
+
+    if (!nextColumns.includes(categoryColumn)) {
+      setCategoryColumn(nextColumns[0] ?? "");
+    }
+
+    if (!nextMetricColumns.includes(metricColumn)) {
+      setMetricColumn(nextMetricColumns[0] ?? nextColumns[0] ?? "");
+    }
+  }, [aggregation, categoryColumn, metricColumn, source]);
 
   if (!open) return null;
 
   const submit = () => {
+    if (!source) return;
     onSubmit({
       id: chart?.id ?? crypto.randomUUID(),
       title,
+      sourceId: source.id,
+      sourceKind: source.kind,
       type,
       categoryColumn,
       metricColumn,
@@ -266,13 +323,13 @@ function ChartDialog({
 
   return (
     <Dialog
-      description="Configure os dados agregados usados pelo grafico."
+      description="Configure a fonte e como os dados serao usados no grafico."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
             Cancelar
           </Button>
-          <Button disabled={!title || !categoryColumn || !metricColumn} onClick={submit} type="button">
+          <Button disabled={!title || !source || !categoryColumn || !metricColumn} onClick={submit} type="button">
             Salvar
           </Button>
         </>
@@ -284,6 +341,16 @@ function ChartDialog({
       <div className="grid gap-4">
         <Input onChange={(event) => setTitle(event.target.value)} placeholder="Titulo" value={title} />
         <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2 text-sm font-medium sm:col-span-2">
+            <LabelWithInfo label="Fonte de dados" info="Escolha a origem deste grafico. Pode ser a amostra de um parquet carregado ou o resultado salvo de uma aba SQL." />
+            <Select onChange={(event) => setSourceKey(event.target.value)} value={sourceKey}>
+              {sources.map((item) => (
+                <option key={`${item.kind}:${item.id}`} value={`${item.kind}:${item.id}`}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+          </label>
           <label className="space-y-2 text-sm font-medium">
             <LabelWithInfo label="Tipo" info="Define a visualizacao: barra para comparacoes, linha para series ordenadas e pizza para participacao por categoria." />
             <Select onChange={(event) => setType(event.target.value as ChartType)} value={type}>
@@ -295,18 +362,18 @@ function ChartDialog({
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
-            <LabelWithInfo label="Agregacao" info="Operacao aplicada aos valores de cada categoria: count, sum, avg, min ou max." />
+            <LabelWithInfo label="Agregacao" info="Use sem agregacao quando sua query ja retornar uma coluna de categoria e outra de valor prontas para o grafico." />
             <Select onChange={(event) => setAggregation(event.target.value as AggregationType)} value={aggregation}>
               {aggregations.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {item === "none" ? "sem agregacao" : item}
                 </option>
               ))}
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
             <LabelWithInfo label="Categoria / eixo X" info="Coluna usada para agrupar os dados. Em barras e linhas aparece no eixo X; em pizza vira o nome das fatias." />
-            <Select onChange={(event) => setCategoryColumn(event.target.value)} value={categoryColumn}>
+            <Select disabled={!columns.length} onChange={(event) => setCategoryColumn(event.target.value)} value={categoryColumn}>
               {columns.map((column) => (
                 <option key={column} value={column}>
                   {column}
@@ -315,8 +382,11 @@ function ChartDialog({
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
-            <LabelWithInfo label="Metrica / eixo Y" info="Coluna numerica usada como valor agregado. Em barras e linhas vira o eixo Y; em pizza define o tamanho das fatias. Com count, qualquer coluna pode ser contada." />
-            <Select onChange={(event) => setMetricColumn(event.target.value)} value={metricColumn}>
+            <LabelWithInfo
+              label="Metrica / eixo Y"
+              info="Coluna numerica usada como valor. Com sem agregacao, o grafico usa os valores linha a linha. Com count, qualquer coluna pode ser contada."
+            />
+            <Select disabled={!columns.length} onChange={(event) => setMetricColumn(event.target.value)} value={metricColumn}>
               {(aggregation === "count" ? columns : numericColumns).map((column) => (
                 <option key={column} value={column}>
                   {column}

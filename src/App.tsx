@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { DashboardView } from "./features/dashboard/DashboardView";
+import { useDashboardStore } from "./features/dashboard/store/dashboardStore";
 import { PreviewView } from "./features/preview/PreviewView";
 import { ProfilingView } from "./features/profiling/ProfilingView";
 import { SchemaView } from "./features/schema/SchemaView";
@@ -73,7 +74,10 @@ function App() {
   const [isStandalone, setIsStandalone] = useState(window.matchMedia("(display-mode: standalone)").matches || iosStandalone);
   const [duckDbStatus, setDuckDbStatus] = useState<DuckDbStatus>("idle");
   const filesRef = useRef<UploadedParquetFile[]>([]);
-  const activeQueryResult = useSqlStore((state) => state.tabs.find((tab) => tab.id === state.activeTabId)?.result);
+  const countChartsBySource = useDashboardStore((state) => state.countChartsBySource);
+  const removeChartsBySource = useDashboardStore((state) => state.removeChartsBySource);
+  const countSourcesReferencingAlias = useSqlStore((state) => state.countSourcesReferencingAlias);
+  const removeSourcesByParquetAlias = useSqlStore((state) => state.removeSourcesByParquetAlias);
 
   const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [activeFileId, files]);
 
@@ -166,6 +170,32 @@ function App() {
   };
 
   const handleRemoveFile = (fileId: string) => {
+    const fileToRemove = filesRef.current.find((file) => file.id === fileId);
+    if (!fileToRemove) return;
+
+    const linkedChartsCount = countChartsBySource("parquet", fileId);
+    const linkedSqlSourcesCount = countSourcesReferencingAlias(fileToRemove.sqlAlias);
+
+    if (
+      (linkedChartsCount > 0 || linkedSqlSourcesCount > 0) &&
+      !window.confirm(
+        `${linkedChartsCount} grafico(s) e ${linkedSqlSourcesCount} querie(s) ligados a este arquivo serao removidos tambem. Deseja continuar?`,
+      )
+    ) {
+      return;
+    }
+
+    if (linkedChartsCount > 0) {
+      removeChartsBySource("parquet", fileId);
+    }
+
+    if (linkedSqlSourcesCount > 0) {
+      const removedSourceIds = removeSourcesByParquetAlias(fileToRemove.sqlAlias, `SELECT *\nFROM data1\nLIMIT 100;`);
+      for (const sourceId of removedSourceIds) {
+        removeChartsBySource("sql", sourceId);
+      }
+    }
+
     const currentFiles = filesRef.current;
     const nextFiles = currentFiles.filter((file) => file.id !== fileId);
     const nextActiveFile = activeFileId === fileId ? nextFiles[0] : nextFiles.find((file) => file.id === activeFileId);
@@ -302,7 +332,7 @@ function App() {
           {activeSection === "preview" && <PreviewView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
           {activeSection === "profiling" && <ProfilingView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
           {activeSection === "sql" && <SqlView duckDbStatus={duckDbStatus} file={activeFile} files={files} />}
-          {activeSection === "dashboard" && <DashboardView file={activeFile} queryResult={activeQueryResult} />}
+          {activeSection === "dashboard" && <DashboardView files={files} />}
         </section>
       </div>
     </main>

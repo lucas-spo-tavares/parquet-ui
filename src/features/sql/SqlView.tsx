@@ -8,6 +8,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useDashboardStore } from "@/features/dashboard/store/dashboardStore";
 import { downloadBlob, downloadCsv } from "@/lib/export/csv";
 import { exportDuckDbQueryToParquet, runDuckDbQuery } from "@/lib/duckdb/client";
 import type { UploadedParquetFile } from "@/types";
@@ -36,6 +37,8 @@ export function SqlView({ file, files, duckDbStatus }: SqlViewProps) {
   const setQueryOpen = useSqlStore((state) => state.setQueryOpen);
   const setQueryResult = useSqlStore((state) => state.setQueryResult);
   const setSql = useSqlStore((state) => state.setSql);
+  const countChartsBySource = useDashboardStore((state) => state.countChartsBySource);
+  const removeChartsBySource = useDashboardStore((state) => state.removeChartsBySource);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
 
   const primaryAlias = files[0]?.sqlAlias ?? "data1";
@@ -70,6 +73,7 @@ FROM ${primaryAlias};`,
   const canRun = files.length > 0 && duckDbStatus === "ready" && runningTabId !== activeTab.id;
   const isRunning = runningTabId === activeTab.id;
   const closingTab = tabs.find((tab) => tab.id === closingTabId);
+  const closingTabLinkedCharts = closingTab ? countChartsBySource("sql", closingTab.sourceId) : 0;
   const isExportingParquet = exportingParquetTabId === activeTab.id;
 
   const run = async () => {
@@ -276,7 +280,11 @@ FROM ${primaryAlias};`,
       </Dialog>
 
       <Dialog
-        description="Essa aba e o resultado atual dela serao fechados."
+        description={
+          closingTabLinkedCharts
+            ? `${closingTabLinkedCharts} grafico(s) ligados a esta query SQL tambem serao removidos.`
+            : "A aba sera fechada e a fonte SQL salva correspondente sera removida."
+        }
         onOpenChange={(open) => setClosingTabId(open ? closingTabId : undefined)}
         open={Boolean(closingTab)}
         title={`Fechar ${closingTab?.name ?? "aba"}`}
@@ -288,7 +296,10 @@ FROM ${primaryAlias};`,
             <Button
               onClick={() => {
                 if (!closingTab) return;
-                closeTab(closingTab.id, defaultSql);
+                const removedSourceId = closeTab(closingTab.id);
+                if (removedSourceId) {
+                  removeChartsBySource("sql", removedSourceId);
+                }
                 setClosingTabId(undefined);
               }}
               type="button"
@@ -298,7 +309,7 @@ FROM ${primaryAlias};`,
           </>
         }
       >
-        <p className="text-sm text-muted-foreground">Voce pode criar outra aba depois pelo botao <code>+</code>.</p>
+        <p className="text-sm text-muted-foreground">Voce pode criar uma nova aba depois pelo botao <code>+</code>.</p>
       </Dialog>
     </div>
   );
