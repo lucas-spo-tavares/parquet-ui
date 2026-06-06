@@ -13,6 +13,7 @@ export type SqlTab = {
   sourceId: string;
   sql: string;
   queryOpen: boolean;
+  resultLimit: number;
   result?: QueryResult;
   queryError?: QueryError;
 };
@@ -31,6 +32,7 @@ type SqlStore = {
   setQueryError: (tabId: string, error: QueryError | undefined) => void;
   setQueryOpen: (tabId: string, open: boolean) => void;
   setQueryResult: (tabId: string, result: QueryResult | undefined) => void;
+  setResultLimit: (tabId: string, resultLimit: number) => void;
   setSql: (tabId: string, sql: string) => void;
 };
 
@@ -55,6 +57,7 @@ function createTab(source: SqlSource): SqlTab {
     sourceId: source.id,
     sql: source.sql,
     queryOpen: true,
+    resultLimit: 1_000,
   };
 }
 
@@ -170,6 +173,10 @@ export const useSqlStore = create<SqlStore>((set, get) => ({
         tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, result } : tab)),
       };
     }),
+  setResultLimit: (tabId, resultLimit) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, resultLimit } : tab)),
+    })),
   setSql: (tabId, sql) =>
     set((state) => {
       const targetTab = state.tabs.find((tab) => tab.id === tabId);

@@ -44,10 +44,10 @@ function shouldWrapWithLimit(sql: string) {
   return normalized.startsWith("select") || normalized.startsWith("with");
 }
 
-function limitedSql(sql: string) {
+function limitedSql(sql: string, maxRows: number) {
   const cleaned = cleanSql(sql);
   if (!shouldWrapWithLimit(cleaned)) return cleaned;
-  return `SELECT * FROM (${cleaned}) AS parquet_ui_query LIMIT ${MAX_QUERY_RESULT_ROWS + 1}`;
+  return `SELECT * FROM (${cleaned}) AS parquet_ui_query LIMIT ${maxRows + 1}`;
 }
 
 function arrowTableToRows(table: unknown): DataRow[] {
@@ -121,16 +121,16 @@ export async function syncDuckDbFiles(files: UploadedParquetFile[]) {
   }
 }
 
-export async function runDuckDbQuery(sql: string): Promise<QueryResult> {
+export async function runDuckDbQuery(sql: string, maxRows = MAX_QUERY_RESULT_ROWS): Promise<QueryResult> {
   const db = await getDb();
   const conn = await db.connect();
   const startedAt = performance.now();
 
   try {
-    const table = await conn.query(limitedSql(sql));
+    const table = await conn.query(limitedSql(sql, maxRows));
     const rows = arrowTableToRows(table);
-    const truncated = rows.length > MAX_QUERY_RESULT_ROWS;
-    const visibleRows = truncated ? rows.slice(0, MAX_QUERY_RESULT_ROWS) : rows;
+    const truncated = rows.length > maxRows;
+    const visibleRows = truncated ? rows.slice(0, maxRows) : rows;
     const columns = Object.keys(visibleRows[0] ?? {});
 
     return {

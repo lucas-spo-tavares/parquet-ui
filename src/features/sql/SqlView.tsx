@@ -1,18 +1,20 @@
 import { ChevronDown, ChevronUp, CircleHelp, Download, FileArchive, Loader2, Play, Plus, RotateCcw, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDashboardStore } from "@/features/dashboard/store/dashboardStore";
 import { downloadBlob, downloadCsv } from "@/lib/export/csv";
 import { exportDuckDbQueryToParquet, runDuckDbQuery } from "@/lib/duckdb/client";
 import type { UploadedParquetFile } from "@/types";
 import { useSqlStore } from "./store/sqlStore";
+
+const queryResultLimitOptions = [100, 1_000, 5_000, 10_000];
 
 type SqlViewProps = {
   file?: UploadedParquetFile;
@@ -26,6 +28,8 @@ FROM ${primaryAlias}
 LIMIT 100;`;
 }
 
+const SqlEditor = lazy(() => import("./SqlEditor"));
+
 export function SqlView({ file, files, duckDbStatus }: SqlViewProps) {
   const tabs = useSqlStore((state) => state.tabs);
   const activeTabId = useSqlStore((state) => state.activeTabId);
@@ -36,6 +40,7 @@ export function SqlView({ file, files, duckDbStatus }: SqlViewProps) {
   const setQueryError = useSqlStore((state) => state.setQueryError);
   const setQueryOpen = useSqlStore((state) => state.setQueryOpen);
   const setQueryResult = useSqlStore((state) => state.setQueryResult);
+  const setResultLimit = useSqlStore((state) => state.setResultLimit);
   const setSql = useSqlStore((state) => state.setSql);
   const countChartsBySource = useDashboardStore((state) => state.countChartsBySource);
   const removeChartsBySource = useDashboardStore((state) => state.removeChartsBySource);
@@ -83,7 +88,7 @@ FROM ${primaryAlias};`,
     setRunningTabId(tabId);
     setQueryError(tabId, undefined);
     try {
-      const nextResult = await runDuckDbQuery(activeTab.sql);
+      const nextResult = await runDuckDbQuery(activeTab.sql, activeTab.resultLimit);
       setQueryResult(tabId, nextResult);
       setQueryError(tabId, undefined);
     } catch (error) {
@@ -152,6 +157,13 @@ FROM ${primaryAlias};`,
                     <Input className="max-w-[280px] font-medium" onChange={(event) => renameTab(tab.id, event.target.value)} value={tab.name} />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Select className="w-[210px]" onChange={(event) => setResultLimit(tab.id, Number(event.target.value))} value={String(tab.resultLimit)}>
+                      {queryResultLimitOptions.map((limit) => (
+                        <option key={limit} value={limit}>
+                          {`Limite de ${limit.toLocaleString("pt-BR")} linhas`}
+                        </option>
+                      ))}
+                    </Select>
                     <Button onClick={() => setQueryOpen(tab.id, !tab.queryOpen)} type="button" variant="outline">
                       {tab.queryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       {tab.queryOpen ? "Recolher" : "Expandir"}
@@ -190,12 +202,9 @@ FROM ${primaryAlias};`,
                 </CardHeader>
                 {tab.queryOpen && (
                   <CardContent className="space-y-4">
-                    <textarea
-                      className="min-h-[260px] w-full rounded-md border border-input bg-background p-3 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                      onChange={(event) => setSql(tab.id, event.target.value)}
-                      spellCheck={false}
-                      value={tab.sql}
-                    />
+                    <Suspense fallback={<div className="min-h-[260px] rounded-md border border-input bg-background p-3 font-mono text-sm text-muted-foreground">Carregando editor SQL...</div>}>
+                      <SqlEditor defaultTable={primaryAlias} files={files} onChange={(value) => setSql(tab.id, value)} value={tab.sql} />
+                    </Suspense>
                     {duckDbStatus === "registering" && <Alert>Registrando aliases dos arquivos Parquet no DuckDB-WASM...</Alert>}
                     {duckDbStatus === "error" && <Alert className="border-destructive/30 bg-red-50 text-red-950">Nao foi possivel inicializar DuckDB-WASM para este arquivo.</Alert>}
                   </CardContent>
@@ -207,7 +216,11 @@ FROM ${primaryAlias};`,
       </Tabs>
 
       {activeTab.queryError && <Alert className="border-destructive/30 bg-red-50 text-red-950">{activeTab.queryError.message}</Alert>}
-      {activeTab.result?.truncated && <Alert>Resultado limitado a {MAX_QUERY_RESULT_ROWS} linhas para proteger a interface.</Alert>}
+      {activeTab.result?.truncated && (
+        <Alert>
+          Resultado limitado a {activeTab.resultLimit.toLocaleString("pt-BR")} linhas. Se precisar, aumente o limite da aba ou exporte CSV/Parquet.
+        </Alert>
+      )}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Resultado</CardTitle>
@@ -259,6 +272,7 @@ FROM ${primaryAlias};`,
               Alias disponiveis: {files.map((item) => item.sqlAlias).join(", ")}. Use esses nomes diretamente nas queries e joins entre Parquets.
             </Alert>
           )}
+          <Alert>O editor tem highlight de sintaxe e autocomplete. Use <strong>Ctrl+Space</strong> para abrir sugestoes manualmente.</Alert>
           <Alert>Queries rodam no navegador via DuckDB-WASM. Nenhum dado e enviado para backend.</Alert>
           <div className="space-y-2">
             <p className="font-medium">Exemplos uteis</p>

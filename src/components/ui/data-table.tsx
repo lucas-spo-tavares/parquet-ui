@@ -9,11 +9,13 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { displayValue } from "@/lib/formatters/formatters";
 import type { DataRow } from "@/types";
 import { Button } from "./button";
 import { Input } from "./input";
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./pagination";
+import { Select } from "./select";
 
 type DataTableProps = {
   rows: DataRow[];
@@ -25,6 +27,7 @@ type DataTableProps = {
 export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [pageInput, setPageInput] = useState("1");
   const resolvedColumns = useMemo(() => columns ?? Array.from(new Set(rows.flatMap((row) => Object.keys(row)))), [columns, rows]);
   const tableColumns = useMemo<ColumnDef<DataRow>[]>(
     () =>
@@ -53,6 +56,20 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
+
+  const pageCount = table.getPageCount();
+  const currentPage = table.getState().pagination.pageIndex + 1;
+
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  const visiblePages = useMemo(() => {
+    if (pageCount <= 5) return Array.from({ length: pageCount }, (_, index) => index + 1);
+
+    const pages = new Set<number>([1, pageCount, currentPage - 1, currentPage, currentPage + 1]);
+    return [...pages].filter((page) => page >= 1 && page <= pageCount).sort((a, b) => a - b);
+  }, [currentPage, pageCount]);
 
   if (!rows.length) {
     return <div className="rounded-md border border-border p-8 text-center text-sm text-muted-foreground">Nenhuma linha para exibir.</div>;
@@ -95,16 +112,82 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
         </table>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span>
-          Pagina {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
-        </span>
-        <div className="flex gap-2">
-          <Button disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()} size="sm" type="button" variant="outline">
-            Anterior
-          </Button>
-          <Button disabled={!table.getCanNextPage()} onClick={() => table.nextPage()} size="sm" type="button" variant="outline">
-            Proxima
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span>Pagina {currentPage} de {pageCount}</span>
+          <Select
+            className="w-[190px]"
+            onChange={(event) => table.setPageSize(Number(event.target.value))}
+            value={String(table.getState().pagination.pageSize)}
+          >
+            {[10, 25, 50].map((size) => (
+              <option key={size} value={size}>
+                {size} itens por pagina
+              </option>
+            ))}
+          </Select>
+          <div className="flex items-center gap-2">
+            <Input
+              aria-label="Ir para pagina"
+              className="w-20"
+              inputMode="numeric"
+              onChange={(event) => setPageInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                const parsed = Number(pageInput);
+                if (!Number.isFinite(parsed)) return;
+                const nextPage = Math.min(Math.max(1, parsed), pageCount);
+                table.setPageIndex(nextPage - 1);
+                setPageInput(String(nextPage));
+              }}
+              placeholder="Pagina"
+              value={pageInput}
+            />
+            <Button
+              onClick={() => {
+                const parsed = Number(pageInput);
+                if (!Number.isFinite(parsed)) return;
+                const nextPage = Math.min(Math.max(1, parsed), pageCount);
+                table.setPageIndex(nextPage - 1);
+                setPageInput(String(nextPage));
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Ir
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Pagination className="mx-0 w-auto justify-start">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()} type="button" />
+              </PaginationItem>
+              {visiblePages.map((page, index) => {
+                const previousPage = visiblePages[index - 1];
+                const showEllipsis = previousPage && page - previousPage > 1;
+
+                return (
+                  <Fragment key={page}>
+                    {showEllipsis ? (
+                      <PaginationItem>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : null}
+                    <PaginationItem>
+                      <PaginationLink isActive={currentPage === page} onClick={() => table.setPageIndex(page - 1)} type="button">
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  </Fragment>
+                );
+              })}
+              <PaginationItem>
+                <PaginationNext disabled={!table.getCanNextPage()} onClick={() => table.nextPage()} type="button" />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
     </div>
