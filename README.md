@@ -190,7 +190,6 @@ Essas variaveis documentam o deploy. Elas nao devem conter credenciais AWS.
 - Deteccao automatica de colunas temporais.
 - Layout de dashboard com drag and drop.
 - Salvamento local de dashboards.
-- Views SQL nomeadas, criadas a partir de queries salvas, para que cada grafico do dashboard possa selecionar sua propria fonte de dados em vez de depender de uma selecao global.
 - Highlight de sintaxe e autocomplete para o editor SQL.
 - Internacionalizacao com React i18n, incluindo ingles, portugues, espanhol, frances, alemao, italiano, chines e japones; detectar idioma pelo navegador, usar ingles como fallback e oferecer seletor de idioma na UI.
 - File handling para abrir arquivos `.parquet` diretamente com a PWA instalada, quando suportado pelo navegador.
