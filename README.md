@@ -179,7 +179,6 @@ Essas variaveis documentam o deploy. Elas nao devem conter credenciais AWS.
 
 ## Roadmap futuro
 
-- Suporte a multiplos arquivos Parquet em queries conjuntas.
 - Comparacao entre arquivos Parquet.
 - Exportacao de resultado de query para Parquet.
 - Exportacao de dashboard como imagem.
