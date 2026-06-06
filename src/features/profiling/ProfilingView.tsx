@@ -1,5 +1,6 @@
 import { Download, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export function ProfilingView({
   files: UploadedParquetFile[];
   onSelectFile: (fileId: string) => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [type, setType] = useState<ColumnType | "all">("all");
   const profile = useMemo(() => (file ? buildProfile(file.sampleRows, file.schema) : undefined), [file]);
@@ -36,27 +38,27 @@ export function ProfilingView({
   }, [profile, search, type]);
 
   if (!file || !profile) {
-    return <Empty title="Profiling" message="Carregue um arquivo .parquet para calcular estatisticas por coluna." />;
+    return <Empty title={t("app.sections.profiling")} message={t("profiling.empty")} />;
   }
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-4">
-        <Stat label="Linhas no arquivo" value={profile.rowCount.toLocaleString("pt-BR")} />
-        <Stat label="Linhas amostradas" value={profile.sampleSize.toLocaleString("pt-BR")} />
-        <Stat label="Colunas" value={profile.columns.length.toString()} />
-        <Stat label="Modo" value={profile.isSampled ? "Amostra" : "Completo"} />
+        <Stat label={t("profiling.stats.fileRows")} value={profile.rowCount.toLocaleString()} />
+        <Stat label={t("profiling.stats.sampledRows")} value={profile.sampleSize.toLocaleString()} />
+        <Stat label={t("profiling.stats.columns")} value={profile.columns.length.toString()} />
+        <Stat label={t("profiling.stats.mode")} value={profile.isSampled ? t("profiling.stats.sample") : t("profiling.stats.full")} />
       </div>
-      <Alert>O profiling inicial usa a amostra carregada do Parquet. Arquivos pequenos podem ser analisados por inteiro.</Alert>
+      <Alert>{t("profiling.alert")}</Alert>
       <div className="grid gap-3 md:grid-cols-[1fr_220px_240px_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar coluna..." value={search} />
+          <Input className="pl-9" onChange={(event) => setSearch(event.target.value)} placeholder={t("common.searchColumn")} value={search} />
         </div>
         <Select onChange={(event) => setType(event.target.value as ColumnType | "all")} value={type}>
           {columnTypes.map((columnType) => (
             <option key={columnType} value={columnType}>
-              {columnType === "all" ? "Todos os tipos" : columnType}
+              {columnType === "all" ? t("common.allTypes") : columnType}
             </option>
           ))}
         </Select>
@@ -69,14 +71,25 @@ export function ProfilingView({
         </Select>
         <Button onClick={() => downloadCsv(`${file.name}-profiling.csv`, profileRowsToCsvRows(profile))} type="button" variant="outline">
           <Download className="h-4 w-4" />
-          Export CSV
+          {t("common.exportCsv")}
         </Button>
       </div>
       <div className="overflow-auto rounded-lg border border-border">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-muted/70">
             <tr>
-              {["Coluna", "Tipo", "Nulos", "Distintos", "Min", "Max", "Media", "Mediana", "Booleanos", "Top valores"].map((header) => (
+              {[
+                t("profiling.headers.column"),
+                t("profiling.headers.type"),
+                t("profiling.headers.nulls"),
+                t("profiling.headers.distinct"),
+                t("profiling.headers.min"),
+                t("profiling.headers.max"),
+                t("profiling.headers.mean"),
+                t("profiling.headers.median"),
+                t("profiling.headers.booleans"),
+                t("profiling.headers.topValues"),
+              ].map((header) => (
                 <th className="border-b border-border px-3 py-3 text-left font-medium" key={header}>
                   {header}
                 </th>
@@ -99,7 +112,7 @@ export function ProfilingView({
                 <td className="px-3 py-3">{column.mean?.toFixed(2) ?? ""}</td>
                 <td className="px-3 py-3">{column.median?.toFixed(2) ?? ""}</td>
                 <td className="px-3 py-3">
-                  {column.type === "boolean" ? `true ${column.trueCount ?? 0} / false ${column.falseCount ?? 0}` : ""}
+                  {column.type === "boolean" ? t("profiling.booleanCounts", { trueCount: column.trueCount ?? 0, falseCount: column.falseCount ?? 0 }) : ""}
                 </td>
                 <td className="px-3 py-3 text-xs text-muted-foreground">
                   {column.topValues.map((value) => `${value.value} (${value.count})`).join(", ")}

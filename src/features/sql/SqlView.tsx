@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, CircleHelp, Download, FileArchive, Loader2, Play, Plus, RotateCcw, X } from "lucide-react";
 import { Suspense, lazy, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,7 @@ LIMIT 100;`;
 const SqlEditor = lazy(() => import("./SqlEditor"));
 
 export function SqlView({ file, files, duckDbStatus }: SqlViewProps) {
+  const { t } = useTranslation();
   const tabs = useSqlStore((state) => state.tabs);
   const activeTabId = useSqlStore((state) => state.activeTabId);
   const addTab = useSqlStore((state) => state.addTab);
@@ -51,20 +53,20 @@ export function SqlView({ file, files, duckDbStatus }: SqlViewProps) {
   const suggestions = useMemo(
     () => [
       {
-        label: `Preview de ${primaryAlias}`,
+        label: t("sql.suggestions.preview", { alias: primaryAlias }),
         sql: buildDefaultSql(primaryAlias),
       },
       {
-        label: `Schema de ${primaryAlias}`,
+        label: t("sql.suggestions.schema", { alias: primaryAlias }),
         sql: `DESCRIBE ${primaryAlias};`,
       },
       {
-        label: `Contagem de ${primaryAlias}`,
+        label: t("sql.suggestions.count", { alias: primaryAlias }),
         sql: `SELECT COUNT(*) AS total_rows
 FROM ${primaryAlias};`,
       },
     ],
-    [primaryAlias],
+    [primaryAlias, t],
   );
   const [helpOpen, setHelpOpen] = useState(false);
   const [closingTabId, setClosingTabId] = useState<string>();
@@ -92,7 +94,7 @@ FROM ${primaryAlias};`,
       setQueryResult(tabId, nextResult);
       setQueryError(tabId, undefined);
     } catch (error) {
-      setQueryError(tabId, { message: error instanceof Error ? error.message : "Erro ao executar SQL." });
+      setQueryError(tabId, { message: error instanceof Error ? error.message : t("sql.runError") });
       setQueryResult(tabId, undefined);
     } finally {
       setRunningTabId((current) => (current === tabId ? undefined : current));
@@ -107,14 +109,14 @@ FROM ${primaryAlias};`,
       const blobBuffer = new Uint8Array(parquetBuffer);
       downloadBlob(`${activeTab.name}.parquet`, new Blob([blobBuffer], { type: "application/octet-stream" }));
     } catch (error) {
-      setQueryError(tabId, { message: error instanceof Error ? error.message : "Erro ao exportar Parquet." });
+      setQueryError(tabId, { message: error instanceof Error ? error.message : t("sql.exportError") });
     } finally {
       setExportingParquetTabId((current) => (current === tabId ? undefined : current));
     }
   };
 
   if (!file) {
-    return <Empty title="SQL" message="Carregue um arquivo .parquet para consultar os aliases SQL gerados para cada arquivo." />;
+    return <Empty title={t("app.sections.sql")} message={t("sql.empty")} />;
   }
 
   return (
@@ -160,13 +162,13 @@ FROM ${primaryAlias};`,
                     <Select className="w-[210px]" onChange={(event) => setResultLimit(tab.id, Number(event.target.value))} value={String(tab.resultLimit)}>
                       {queryResultLimitOptions.map((limit) => (
                         <option key={limit} value={limit}>
-                          {`Limite de ${limit.toLocaleString("pt-BR")} linhas`}
+                          {t("sql.resultLimit", { count: limit })}
                         </option>
                       ))}
                     </Select>
                     <Button onClick={() => setQueryOpen(tab.id, !tab.queryOpen)} type="button" variant="outline">
                       {tab.queryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      {tab.queryOpen ? "Recolher" : "Expandir"}
+                      {tab.queryOpen ? t("sql.collapse") : t("sql.expand")}
                     </Button>
                     <Button
                       disabled={!tabCanRun}
@@ -179,11 +181,11 @@ FROM ${primaryAlias};`,
                       type="button"
                     >
                       {tabIsRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                      Run query
+                      {t("sql.run")}
                     </Button>
                     <Button onClick={() => setSql(tab.id, "")} type="button" variant="outline">
                       <RotateCcw className="h-4 w-4" />
-                      Clear
+                      {t("sql.clear")}
                     </Button>
                     <Button
                       onClick={() => {
@@ -196,17 +198,17 @@ FROM ${primaryAlias};`,
                       variant="outline"
                     >
                       <CircleHelp className="h-4 w-4" />
-                      Ajuda
+                      {t("sql.help")}
                     </Button>
                   </div>
                 </CardHeader>
                 {tab.queryOpen && (
                   <CardContent className="space-y-4">
-                    <Suspense fallback={<div className="min-h-[260px] rounded-md border border-input bg-background p-3 font-mono text-sm text-muted-foreground">Carregando editor SQL...</div>}>
+                    <Suspense fallback={<div className="min-h-[260px] rounded-md border border-input bg-background p-3 font-mono text-sm text-muted-foreground">{t("sql.editorLoading")}</div>}>
                       <SqlEditor defaultTable={primaryAlias} files={files} onChange={(value) => setSql(tab.id, value)} value={tab.sql} />
                     </Suspense>
-                    {duckDbStatus === "registering" && <Alert>Registrando aliases dos arquivos Parquet no DuckDB-WASM...</Alert>}
-                    {duckDbStatus === "error" && <Alert className="border-destructive/30 bg-red-50 text-red-950">Nao foi possivel inicializar DuckDB-WASM para este arquivo.</Alert>}
+                    {duckDbStatus === "registering" && <Alert>{t("sql.registering")}</Alert>}
+                    {duckDbStatus === "error" && <Alert className="border-destructive/30 bg-red-50 text-red-950">{t("sql.initFailed")}</Alert>}
                   </CardContent>
                 )}
               </Card>
@@ -218,12 +220,12 @@ FROM ${primaryAlias};`,
       {activeTab.queryError && <Alert className="border-destructive/30 bg-red-50 text-red-950">{activeTab.queryError.message}</Alert>}
       {activeTab.result?.truncated && (
         <Alert>
-          Resultado limitado a {activeTab.resultLimit.toLocaleString("pt-BR")} linhas. Se precisar, aumente o limite da aba ou exporte CSV/Parquet.
+          {t("sql.resultLimited", { count: activeTab.resultLimit })}
         </Alert>
       )}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>Resultado</CardTitle>
+          <CardTitle>{t("sql.resultTitle")}</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               disabled={isExportingParquet || duckDbStatus !== "ready" || !activeTab.result?.rows.length}
@@ -232,7 +234,7 @@ FROM ${primaryAlias};`,
               variant="outline"
             >
               {isExportingParquet ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
-              Export Parquet
+              {t("sql.exportParquet")}
             </Button>
             <Button
               disabled={!activeTab.result?.rows.length}
@@ -241,17 +243,17 @@ FROM ${primaryAlias};`,
               variant="outline"
             >
               <Download className="h-4 w-4" />
-              Export CSV
+              {t("common.exportCsv")}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="min-w-0">
           {!activeTab.result ? (
-            <div className="rounded-md border border-border p-8 text-sm text-muted-foreground">Execute uma query para ver os resultados.</div>
+            <div className="rounded-md border border-border p-8 text-sm text-muted-foreground">{t("sql.executeHint")}</div>
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                <span>{activeTab.result.rowCount.toLocaleString("pt-BR")} linha(s)</span>
+                <span>{t("sql.rowsCount", { count: activeTab.result.rowCount })}</span>
                 <span>{activeTab.result.executionMs.toFixed(1)} ms</span>
               </div>
               <DataTable columns={activeTab.result.columns} rows={activeTab.result.rows} pageSize={25} />
@@ -261,21 +263,23 @@ FROM ${primaryAlias};`,
       </Card>
 
       <Dialog
-        description="Atalhos rapidos para consultar os Parquets carregados."
+        description={t("sql.helpDialog.description")}
         onOpenChange={setHelpOpen}
         open={helpOpen}
-        title="Ajuda SQL"
+        title={t("sql.helpDialog.title")}
       >
         <div className="space-y-4 text-sm">
           {!!files.length && (
             <Alert>
-              Alias disponiveis: {files.map((item) => item.sqlAlias).join(", ")}. Use esses nomes diretamente nas queries e joins entre Parquets.
+              {t("sql.helpDialog.aliases", { aliases: files.map((item) => item.sqlAlias).join(", ") })}
             </Alert>
           )}
-          <Alert>O editor tem highlight de sintaxe e autocomplete. Use <strong>Ctrl+Space</strong> para abrir sugestoes manualmente.</Alert>
-          <Alert>Queries rodam no navegador via DuckDB-WASM. Nenhum dado e enviado para backend.</Alert>
+          <Alert>
+            <Trans components={[<strong key="shortcut" />]} i18nKey="sql.helpDialog.editor" />
+          </Alert>
+          <Alert>{t("sql.helpDialog.local")}</Alert>
           <div className="space-y-2">
-            <p className="font-medium">Exemplos uteis</p>
+            <p className="font-medium">{t("sql.helpDialog.examples")}</p>
             {suggestions.map((suggestion) => (
               <button
                 className="block w-full rounded-md border border-border bg-background p-3 text-left font-mono text-xs transition hover:bg-muted"
@@ -296,16 +300,16 @@ FROM ${primaryAlias};`,
       <Dialog
         description={
           closingTabLinkedCharts
-            ? `${closingTabLinkedCharts} grafico(s) ligados a esta query SQL tambem serao removidos.`
-            : "A aba sera fechada e a fonte SQL salva correspondente sera removida."
+            ? t("sql.closeDialog.withCharts", { count: closingTabLinkedCharts })
+            : t("sql.closeDialog.withoutCharts")
         }
         onOpenChange={(open) => setClosingTabId(open ? closingTabId : undefined)}
         open={Boolean(closingTab)}
-        title={`Fechar ${closingTab?.name ?? "aba"}`}
+        title={t("sql.closeDialog.title", { name: closingTab?.name ?? t("common.close") })}
         footer={
           <>
             <Button onClick={() => setClosingTabId(undefined)} type="button" variant="outline">
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -318,12 +322,14 @@ FROM ${primaryAlias};`,
               }}
               type="button"
             >
-              Fechar aba
+              {t("sql.closeDialog.confirm")}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-muted-foreground">Voce pode criar uma nova aba depois pelo botao <code>+</code>.</p>
+        <p className="text-sm text-muted-foreground">
+          <Trans components={[<code key="plus" />]} i18nKey="sql.closeDialog.hint" />
+        </p>
       </Dialog>
     </div>
   );

@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ type SchemaViewProps = {
 const columnTypes: Array<ColumnType | "all"> = ["all", "string", "number", "integer", "boolean", "date", "timestamp", "decimal", "unknown"];
 
 export function SchemaView({ files, file, onSelectFile }: SchemaViewProps) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [type, setType] = useState<ColumnType | "all">("all");
 
@@ -32,26 +34,26 @@ export function SchemaView({ files, file, onSelectFile }: SchemaViewProps) {
   }, [file, search, type]);
 
   if (!file) {
-    return <EmptySection title="Schema" message="Carregue um arquivo .parquet para visualizar schema e tipos inferidos." />;
+    return <EmptySection title={t("app.sections.schema")} message={t("schema.empty")} />;
   }
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Colunas" value={file.schema.columns.length.toString()} />
-        <StatCard label="Linhas no metadata" value={file.schema.rowCount.toLocaleString("pt-BR")} />
-        <StatCard label="Amostra analisada" value={file.sampleRows.length.toLocaleString("pt-BR")} />
+        <StatCard label={t("schema.stats.columns")} value={file.schema.columns.length.toString()} />
+        <StatCard label={t("schema.stats.metadataRows")} value={file.schema.rowCount.toLocaleString()} />
+        <StatCard label={t("schema.stats.sampleSize")} value={file.sampleRows.length.toLocaleString()} />
       </div>
-      <Alert>Null count, percentual de nulos e exemplos sao estimados com base na amostra inicial.</Alert>
+      <Alert>{t("schema.sampleAlert")}</Alert>
       <div className="grid gap-3 md:grid-cols-[1fr_220px_240px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar coluna..." value={search} />
+          <Input className="pl-9" onChange={(event) => setSearch(event.target.value)} placeholder={t("common.searchColumn")} value={search} />
         </div>
         <Select onChange={(event) => setType(event.target.value as ColumnType | "all")} value={type}>
           {columnTypes.map((columnType) => (
             <option key={columnType} value={columnType}>
-              {columnType === "all" ? "Todos os tipos" : columnType}
+              {columnType === "all" ? t("common.allTypes") : columnType}
             </option>
           ))}
         </Select>
@@ -67,7 +69,15 @@ export function SchemaView({ files, file, onSelectFile }: SchemaViewProps) {
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-muted/70">
             <tr>
-              {["Coluna", "Parquet", "UI", "Nullable", "Exemplo", "Nulos estimados", "% nulos"].map((header) => (
+              {[
+                t("schema.headers.column"),
+                t("schema.headers.parquet"),
+                t("schema.headers.ui"),
+                t("schema.headers.nullable"),
+                t("schema.headers.example"),
+                t("schema.headers.estimatedNulls"),
+                t("schema.headers.nullPercent"),
+              ].map((header) => (
                 <th className="border-b border-border px-3 py-3 text-left font-medium" key={header}>
                   {header}
                 </th>
@@ -85,10 +95,10 @@ export function SchemaView({ files, file, onSelectFile }: SchemaViewProps) {
                 <td className="px-3 py-3">
                   <Badge>{column.uiType}</Badge>
                 </td>
-                <td className="px-3 py-3">{column.nullable === null ? "N/D" : column.nullable ? "sim" : "nao"}</td>
+                <td className="px-3 py-3">{column.nullable === null ? t("common.notAvailable") : column.nullable ? t("common.yes") : t("common.no")}</td>
                 <td className="max-w-[240px] truncate px-3 py-3">{displayValue(column.example)}</td>
-                <td className="px-3 py-3">{column.nullCount ?? "N/D"}</td>
-                <td className="px-3 py-3">{column.nullPercent === undefined ? "N/D" : formatPercent(column.nullPercent)}</td>
+                <td className="px-3 py-3">{column.nullCount ?? t("common.notAvailable")}</td>
+                <td className="px-3 py-3">{column.nullPercent === undefined ? t("common.notAvailable") : formatPercent(column.nullPercent)}</td>
               </tr>
             ))}
           </tbody>

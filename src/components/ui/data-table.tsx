@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { displayValue } from "@/lib/formatters/formatters";
 import type { DataRow } from "@/types";
 import { Button } from "./button";
@@ -25,6 +26,7 @@ type DataTableProps = {
 };
 
 export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: DataTableProps) {
+  const { t } = useTranslation();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [pageInput, setPageInput] = useState("1");
@@ -72,16 +74,16 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
   }, [currentPage, pageCount]);
 
   if (!rows.length) {
-    return <div className="rounded-md border border-border p-8 text-center text-sm text-muted-foreground">Nenhuma linha para exibir.</div>;
+    return <div className="rounded-md border border-border p-8 text-center text-sm text-muted-foreground">{t("dataTable.noRows")}</div>;
   }
 
   return (
     <div className="space-y-3">
       {searchable && (
         <Input
-          aria-label="Buscar na tabela"
+          aria-label={t("dataTable.searchAria")}
           onChange={(event) => setGlobalFilter(event.target.value)}
-          placeholder="Buscar nas linhas visiveis..."
+          placeholder={t("dataTable.searchPlaceholder")}
           value={globalFilter}
         />
       )}
@@ -113,7 +115,7 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center gap-2">
-          <span>Pagina {currentPage} de {pageCount}</span>
+          <span>{t("dataTable.pageOf", { page: currentPage, total: pageCount })}</span>
           <Select
             className="w-[190px]"
             onChange={(event) => table.setPageSize(Number(event.target.value))}
@@ -121,13 +123,13 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
           >
             {[10, 25, 50].map((size) => (
               <option key={size} value={size}>
-                {size} itens por pagina
+                {t("dataTable.pageSize", { count: size })}
               </option>
             ))}
           </Select>
           <div className="flex items-center gap-2">
             <Input
-              aria-label="Ir para pagina"
+              aria-label={t("dataTable.goToPage")}
               className="w-20"
               inputMode="numeric"
               onChange={(event) => setPageInput(event.target.value)}
@@ -139,7 +141,7 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
                 table.setPageIndex(nextPage - 1);
                 setPageInput(String(nextPage));
               }}
-              placeholder="Pagina"
+              placeholder={t("dataTable.pagePlaceholder")}
               value={pageInput}
             />
             <Button
@@ -154,7 +156,7 @@ export function DataTable({ rows, columns, searchable = true, pageSize = 25 }: D
               type="button"
               variant="outline"
             >
-              Ir
+              {t("dataTable.go")}
             </Button>
           </div>
         </div>

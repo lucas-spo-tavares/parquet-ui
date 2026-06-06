@@ -9,8 +9,10 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
+import { Select } from "./components/ui/select";
 import { DashboardView } from "./features/dashboard/DashboardView";
 import { useDashboardStore } from "./features/dashboard/store/dashboardStore";
 import { PreviewView } from "./features/preview/PreviewView";
@@ -19,6 +21,7 @@ import { SchemaView } from "./features/schema/SchemaView";
 import { useSqlStore } from "./features/sql/store/sqlStore";
 import { SqlView } from "./features/sql/SqlView";
 import { UploadView } from "./features/upload/UploadView";
+import { languageOptions, type AppLanguage } from "./i18n";
 import { syncDuckDbFiles } from "./lib/duckdb/client";
 import type { UploadedParquetFile } from "./types";
 
@@ -29,15 +32,6 @@ type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
-
-const navItems: Array<{ id: Section; label: string; icon: typeof FolderOpen }> = [
-  { id: "upload", label: "Upload", icon: FolderOpen },
-  { id: "schema", label: "Schema", icon: TableProperties },
-  { id: "preview", label: "Preview", icon: FileSpreadsheet },
-  { id: "profiling", label: "Profiling", icon: BadgeCheck },
-  { id: "sql", label: "SQL", icon: Database },
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-];
 
 function normalizeSqlAlias(value: string) {
   const normalized = value
@@ -65,6 +59,7 @@ function createUniqueSqlAlias(baseAlias: string, usedAliases: Set<string>) {
 }
 
 function App() {
+  const { i18n, t } = useTranslation();
   const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   const [files, setFiles] = useState<UploadedParquetFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string>();
@@ -78,6 +73,14 @@ function App() {
   const removeChartsBySource = useDashboardStore((state) => state.removeChartsBySource);
   const countSourcesReferencingAlias = useSqlStore((state) => state.countSourcesReferencingAlias);
   const removeSourcesByParquetAlias = useSqlStore((state) => state.removeSourcesByParquetAlias);
+  const navItems: Array<{ id: Section; label: string; icon: typeof FolderOpen }> = [
+    { id: "upload", label: t("app.sections.upload"), icon: FolderOpen },
+    { id: "schema", label: t("app.sections.schema"), icon: TableProperties },
+    { id: "preview", label: t("app.sections.preview"), icon: FileSpreadsheet },
+    { id: "profiling", label: t("app.sections.profiling"), icon: BadgeCheck },
+    { id: "sql", label: t("app.sections.sql"), icon: Database },
+    { id: "dashboard", label: t("app.sections.dashboard"), icon: LayoutDashboard },
+  ];
 
   const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [activeFileId, files]);
 
@@ -179,7 +182,7 @@ function App() {
     if (
       (linkedChartsCount > 0 || linkedSqlSourcesCount > 0) &&
       !window.confirm(
-        `${linkedChartsCount} grafico(s) e ${linkedSqlSourcesCount} querie(s) ligados a este arquivo serao removidos tambem. Deseja continuar?`,
+        t("app.confirm.removeFileWithDependencies", { charts: linkedChartsCount, queries: linkedSqlSourcesCount }),
       )
     ) {
       return;
@@ -240,7 +243,7 @@ function App() {
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <div className="mx-auto flex max-w-[1500px] items-center gap-2">
             <WifiOff className="h-4 w-4 shrink-0" />
-            <span>Voce esta offline. A SPA continua abrindo apos o primeiro acesso; arquivos Parquet seguem locais no navegador.</span>
+            <span>{t("app.status.offline")}</span>
           </div>
         </div>
       )}
@@ -253,11 +256,11 @@ function App() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-semibold leading-tight">Parquet UI</h1>
-              <p className="text-xs text-muted-foreground">Local Parquet Explorer</p>
+              <p className="text-xs text-muted-foreground">{t("app.sidebar.subtitle")}</p>
             </div>
           </div>
 
-          <nav className="grid grid-cols-2 gap-2 lg:grid-cols-1" aria-label="Secoes">
+          <nav className="grid grid-cols-2 gap-2 lg:grid-cols-1" aria-label={t("app.sidebar.sectionsNav")}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
@@ -280,6 +283,16 @@ function App() {
           </nav>
 
           <div className="mt-6 space-y-3">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{t("app.sidebar.language")}</p>
+              <Select onChange={(event) => void i18n.changeLanguage(event.target.value as AppLanguage)} value={i18n.resolvedLanguage?.split("-")[0] ?? "en"}>
+                {languageOptions.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button
               className="w-full"
               disabled={!installPrompt || isStandalone}
@@ -288,18 +301,18 @@ function App() {
               variant="outline"
             >
               <Download className="h-4 w-4" />
-              {isStandalone ? "App instalado" : "Instalar PWA"}
+              {isStandalone ? t("app.sidebar.appInstalled") : t("app.sidebar.installPwa")}
             </Button>
             {activeFile && (
               <Alert>
                 <div className="space-y-1 text-sm">
                   <div>
-                    Arquivo ativo: <strong>{activeFile.sqlAlias}</strong>
+                    {t("app.sidebar.activeFileLabel")} <strong>{activeFile.sqlAlias}</strong>
                   </div>
                   <div className="truncate text-muted-foreground" title={activeFile.name}>
                     {activeFile.name}
                   </div>
-                  <div className="text-muted-foreground">Schema, Preview e Profiling usam esse parquet.</div>
+                  <div className="text-muted-foreground">{t("app.sidebar.activeFileHint")}</div>
                 </div>
               </Alert>
             )}
@@ -309,12 +322,10 @@ function App() {
         <section className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mb-6 flex flex-col gap-2 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">SPA frontend, local e instalavel</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("app.header.eyebrow")}</p>
               <h2 className="mt-1 text-2xl font-semibold tracking-normal">{navItems.find((item) => item.id === activeSection)?.label}</h2>
             </div>
-            <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-              Leitura Parquet, SQL com DuckDB-WASM, profiling, preview e graficos rodam no navegador.
-            </p>
+            <p className="max-w-xl text-sm leading-6 text-muted-foreground">{t("app.header.description")}</p>
           </div>
 
           {activeSection === "upload" && (

@@ -1,5 +1,7 @@
 import { AlertTriangle, CheckCircle2, FileUp, HardDrive, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
+import type { TFunction } from "i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { LARGE_FILE_SIZE_MB } from "@/app/constants";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +21,10 @@ type UploadViewProps = {
   onSelectFile: (fileId: string) => void;
 };
 
-function browserSupportMessage() {
-  if (!("WebAssembly" in window)) return "Seu navegador nao oferece WebAssembly, necessario para DuckDB-WASM.";
-  if (!("File" in window) || !("Blob" in window)) return "Seu navegador nao oferece File API suficiente para ler Parquet localmente.";
-  if (typeof BigInt === "undefined") return "Seu navegador nao oferece BigInt, necessario para metadados Parquet modernos.";
+function browserSupportMessage(t: TFunction) {
+  if (!("WebAssembly" in window)) return t("upload.warnings.noWasm");
+  if (!("File" in window) || !("Blob" in window)) return t("upload.warnings.noFileApi");
+  if (typeof BigInt === "undefined") return t("upload.warnings.noBigInt");
   return "";
 }
 
@@ -31,10 +33,11 @@ function truncateFileName(name: string) {
 }
 
 export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRemoveFile, onRenameFileAlias, onSelectFile }: UploadViewProps) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [warning, setWarning] = useState(browserSupportMessage());
+  const [warning, setWarning] = useState(browserSupportMessage(t));
   const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
 
   const handleFiles = async (fileList: FileList | null) => {
@@ -45,7 +48,7 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
     const parquetFiles = selectedFiles.filter((file) => file.name.toLowerCase().endsWith(".parquet"));
 
     if (invalidFiles.length) {
-      setError("Apenas arquivos .parquet sao aceitos. CSV, JSON, Excel e outros formatos nao sao importados.");
+      setError(t("upload.errors.onlyParquet"));
     } else {
       setError("");
     }
@@ -56,13 +59,13 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
     try {
       for (const file of parquetFiles) {
         if (file.size > LARGE_FILE_SIZE_MB * 1024 * 1024) {
-          setWarning(`Arquivo grande detectado: acima de ${LARGE_FILE_SIZE_MB} MB. Preview e profiling usam amostragem inicial.`);
+          setWarning(t("upload.warnings.largeFile", { size: LARGE_FILE_SIZE_MB }));
         }
         const loadedFile = await readParquetFile(file);
         await onFileLoaded(loadedFile);
       }
     } catch (readError) {
-      setError(readError instanceof Error ? readError.message : "Nao foi possivel ler o arquivo Parquet.");
+      setError(readError instanceof Error ? readError.message : t("upload.errors.readFailed"));
     } finally {
       setLoading(false);
     }
@@ -110,12 +113,12 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
           <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-md border bg-background">
             {loading ? <Loader2 className="h-7 w-7 animate-spin text-primary" /> : <FileUp className="h-7 w-7 text-primary" />}
           </div>
-          <span className="text-lg font-semibold">{loading ? "Lendo Parquet localmente..." : "Arraste arquivos .parquet ou selecione"}</span>
+          <span className="text-lg font-semibold">{loading ? t("upload.dropzone.loading") : t("upload.dropzone.idle")}</span>
           <span className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            A aplicacao aceita exclusivamente Parquet. O processamento acontece no navegador e nenhum arquivo e enviado para servidores.
+            {t("upload.dropzone.description")}
           </span>
           <Button className="mt-5" disabled={loading} onClick={() => fileInputRef.current?.click()} type="button">
-            Selecionar Parquet
+            {t("upload.dropzone.cta")}
           </Button>
         </div>
       </div>
@@ -125,20 +128,20 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <HardDrive className="h-5 w-5" />
-              Arquivos da sessao
+              {t("upload.session.title")}
             </CardTitle>
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>{files.length ? `${files.length} arquivo(s) carregado(s)` : "Estado vazio"}</span>
+              <span>{files.length ? t("upload.session.loadedCount", { count: files.length }) : t("upload.session.emptyState")}</span>
               <span className="inline-flex items-center gap-1.5">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                SPA local. Os arquivos Parquet nao saem do navegador.
+                {t("upload.session.localSpa")}
               </span>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {!files.length ? (
               <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-                Nenhum Parquet carregado ainda. Apos selecionar um arquivo, schema, preview, profiling, SQL e dashboard ficam ativos.
+                {t("upload.session.noFiles")}
               </div>
             ) : (
               files.map((file) => {
@@ -157,9 +160,9 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
                         </p>
                       </button>
                       <div className="flex items-center gap-2">
-                        {isActive && <Badge>ativo</Badge>}
+                        {isActive && <Badge>{t("upload.session.active")}</Badge>}
                         <Button
-                          aria-label={`Remover ${file.name} da sessao`}
+                          aria-label={t("upload.session.removeFileAria", { name: file.name })}
                           onClick={() => onRemoveFile(file.id)}
                           size="icon"
                           type="button"
@@ -170,7 +173,7 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Alias SQL</span>
+                      <span className="text-xs text-muted-foreground">{t("upload.session.sqlAlias")}</span>
                       <input
                         className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                         onBlur={() => {
@@ -196,16 +199,19 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRe
                 );
               })
             )}
-            {duckDbStatus === "registering" && <Badge>Registrando aliases SQL no DuckDB...</Badge>}
+            {duckDbStatus === "registering" && <Badge>{t("upload.session.registering")}</Badge>}
             {duckDbStatus === "ready" && (
               <Badge className="bg-emerald-50 text-emerald-700">
                 <CheckCircle2 className="mr-1 h-3 w-3" />
-                DuckDB pronto
+                {t("upload.session.ready")}
               </Badge>
             )}
             {!!files.length && (
               <div className="text-xs leading-5 text-muted-foreground">
-                Use os aliases nas queries, por exemplo: <code>SELECT * FROM data1</code> ou <code>SELECT * FROM data1 JOIN data2 ...</code>.
+                <Trans
+                  components={[<code key="query1" />, <code key="query2" />]}
+                  i18nKey="upload.session.aliasHint"
+                />
               </div>
             )}
           </CardContent>

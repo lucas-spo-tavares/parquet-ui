@@ -1,0 +1,70 @@
+import { en, type TranslationSchema } from "./en";
+
+export const es: TranslationSchema = {
+  ...en,
+  app: {
+    ...en.app,
+    sections: {
+      upload: "Carga",
+      schema: "Esquema",
+      preview: "Vista previa",
+      profiling: "Perfilado",
+      sql: "SQL",
+      dashboard: "Dashboard",
+    },
+    sidebar: {
+      ...en.app.sidebar,
+      subtitle: "Explorador local de Parquet",
+      sectionsNav: "Secciones",
+      language: "Idioma",
+      installPwa: "Instalar PWA",
+      appInstalled: "Aplicación instalada",
+      activeFileLabel: "Archivo activo:",
+      activeFileHint: "Schema, Preview y Profiling usan este Parquet.",
+    },
+    header: {
+      eyebrow: "SPA frontend, local e instalable",
+      description: "Lectura Parquet, SQL con DuckDB-WASM, profiling, preview y gráficos se ejecutan en el navegador.",
+    },
+    status: {
+      offline: "Estás sin conexión. La SPA sigue abriéndose después del primer acceso y los archivos Parquet permanecen locales en el navegador.",
+    },
+    confirm: {
+      removeFileWithDependencies: "{{charts}} gráfico(s) y {{queries}} query(s) vinculados a este archivo también se eliminarán. ¿Deseas continuar?",
+    },
+  },
+  common: {
+    ...en.common,
+    cancel: "Cancelar",
+    save: "Guardar",
+    loading: "Cargando...",
+    searchColumn: "Buscar columna...",
+    exportCsv: "Exportar CSV",
+    emptyState: "Estado vacío",
+    notAvailable: "N/D",
+    yes: "sí",
+    no: "no",
+    allTypes: "Todos los tipos",
+    sourceRemoved: "Fuente eliminada",
+    remove: "Eliminar",
+    edit: "Editar",
+    close: "Cerrar",
+  },
+  dataTable: {
+    ...en.dataTable,
+    noRows: "No hay filas para mostrar.",
+    searchAria: "Buscar en la tabla",
+    searchPlaceholder: "Buscar en las filas visibles...",
+    pageOf: "Página {{page}} de {{total}}",
+    pageSize: "{{count}} elementos por página",
+    goToPage: "Ir a la página",
+    pagePlaceholder: "Página",
+    go: "Ir",
+  },
+  pagination: {
+    previous: "Anterior",
+    next: "Siguiente",
+    morePages: "Más páginas",
+    navLabel: "paginación",
+  },
+};

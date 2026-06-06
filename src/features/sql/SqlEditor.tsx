@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { sql } from "@codemirror/lang-sql";
 import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import type { UploadedParquetFile } from "@/types";
@@ -15,6 +16,7 @@ function buildSchema(files: UploadedParquetFile[]) {
 }
 
 export function SqlEditor({ defaultTable, files, onChange, value }: SqlEditorProps) {
+  const { t } = useTranslation();
   const extensions = useMemo(
     () => [
       sql({
@@ -81,7 +83,7 @@ export function SqlEditor({ defaultTable, files, onChange, value }: SqlEditorPro
       height="260px"
       indentWithTab
       onChange={onChange}
-      placeholder="SELECT * FROM data1 LIMIT 100;"
+      placeholder={t("sql.editorPlaceholder", { alias: defaultTable ?? "data1" })}
       theme="light"
       value={value}
     />

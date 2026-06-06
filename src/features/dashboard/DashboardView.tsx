@@ -1,5 +1,6 @@
 import { BarChart3, Download, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Bar,
   BarChart,
@@ -54,6 +55,7 @@ function getMetricColumns(rows: DataRow[], columns: string[]) {
 }
 
 export function DashboardView({ files }: DashboardViewProps) {
+  const { t } = useTranslation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string>();
   const sqlTabs = useSqlStore((state) => state.tabs);
@@ -68,7 +70,7 @@ export function DashboardView({ files }: DashboardViewProps) {
         return {
           id: file.id,
           kind: "parquet" as const,
-          label: `Parquet: ${file.sqlAlias}`,
+          label: t("dashboard.labels.parquetSource", { alias: file.sqlAlias }),
           columns,
           metricColumns: getMetricColumns(file.sampleRows, columns),
           rows: file.sampleRows,
@@ -82,14 +84,14 @@ export function DashboardView({ files }: DashboardViewProps) {
           return {
             id: tab.sourceId,
             kind: "sql" as const,
-            label: `SQL: ${tab.name}`,
+            label: t("dashboard.labels.sqlSource", { name: tab.name }),
             columns,
             metricColumns: getMetricColumns(rows, columns),
             rows,
           };
         }),
     ],
-    [files, sqlTabs],
+    [files, sqlTabs, t],
   );
 
   const sourcesByKey = useMemo(
@@ -109,31 +111,31 @@ export function DashboardView({ files }: DashboardViewProps) {
   };
 
   if (!files.length) {
-    return <Empty title="Dashboard" message="Carregue um arquivo .parquet para criar graficos." />;
+    return <Empty title={t("dashboard.title")} message={t("dashboard.empty")} />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">Cada grafico escolhe sua propria fonte de dados: parquet ou query SQL salva.</p>
+          <h2 className="text-lg font-semibold">{t("dashboard.title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("dashboard.subtitle")}</p>
         </div>
         <Button disabled={!sources.length} onClick={openNew} type="button">
           <Plus className="h-4 w-4" />
-          Adicionar grafico
+          {t("dashboard.addChart")}
         </Button>
       </div>
 
-      <Alert>Graficos podem usar a amostra de qualquer parquet carregado ou o resultado salvo de uma aba SQL com dados disponiveis.</Alert>
+      <Alert>{t("dashboard.alert")}</Alert>
 
       {!charts.length ? (
         <Card>
           <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-3 pt-5 text-center">
             <BarChart3 className="h-10 w-10 text-muted-foreground" />
             <div>
-              <p className="font-medium">Nenhum grafico adicionado</p>
-              <p className="mt-1 text-sm text-muted-foreground">Configure barra, linha ou pizza a partir das fontes de dados disponiveis.</p>
+              <p className="font-medium">{t("dashboard.noCharts")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t("dashboard.noChartsHint")}</p>
             </div>
           </CardContent>
         </Card>
@@ -148,7 +150,7 @@ export function DashboardView({ files }: DashboardViewProps) {
                   <div>
                     <CardTitle>{chart.title}</CardTitle>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {source?.label ?? "Fonte removida"} ·{" "}
+                      {source?.label ?? t("common.sourceRemoved")} ·{" "}
                       {chart.aggregation === "none"
                         ? `${chart.metricColumn} por ${chart.categoryColumn}`
                         : `${chart.aggregation} de ${chart.metricColumn} por ${chart.categoryColumn}`}
@@ -156,7 +158,7 @@ export function DashboardView({ files }: DashboardViewProps) {
                   </div>
                   <div className="flex gap-1">
                     <Button
-                      aria-label="Exportar dados agregados"
+                      aria-label={t("dashboard.aria.exportChart")}
                       onClick={() => downloadCsv(`${chart.title}-chart.csv`, data)}
                       size="icon"
                       type="button"
@@ -165,7 +167,7 @@ export function DashboardView({ files }: DashboardViewProps) {
                       <Download className="h-4 w-4" />
                     </Button>
                     <Button
-                      aria-label="Editar grafico"
+                      aria-label={t("dashboard.aria.editChart")}
                       onClick={() => {
                         setEditingId(chart.id);
                         setDialogOpen(true);
@@ -176,14 +178,14 @@ export function DashboardView({ files }: DashboardViewProps) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button aria-label="Remover grafico" onClick={() => removeChart(chart.id)} size="icon" type="button" variant="ghost">
+                    <Button aria-label={t("dashboard.aria.removeChart")} onClick={() => removeChart(chart.id)} size="icon" type="button" variant="ghost">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
                   {!source ? (
-                    <Alert className="border-destructive/30 bg-red-50 text-red-950">A fonte deste grafico nao existe mais. Edite o grafico para escolher outra.</Alert>
+                    <Alert className="border-destructive/30 bg-red-50 text-red-950">{t("dashboard.sourceRemovedAlert")}</Alert>
                   ) : (
                     <div className="h-[320px]">
                       <ChartRenderer config={chart} data={data} />
@@ -208,8 +210,9 @@ export function DashboardView({ files }: DashboardViewProps) {
 }
 
 function ChartRenderer({ config, data }: { config: ChartConfig; data: Array<{ category: string; value: number }> }) {
+  const { t } = useTranslation();
   if (!data.length) {
-    return <div className="grid h-full place-items-center rounded-md border border-border text-sm text-muted-foreground">Sem dados agregados.</div>;
+    return <div className="grid h-full place-items-center rounded-md border border-border text-sm text-muted-foreground">{t("dashboard.noData")}</div>;
   }
 
   if (config.type === "pie") {
@@ -268,6 +271,7 @@ function ChartDialog({
   onSubmit: (config: ChartConfig) => void;
   sources: DashboardSource[];
 }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(chart?.title ?? "Novo grafico");
   const [sourceKey, setSourceKey] = useState("");
   const [type, setType] = useState<ChartType>(chart?.type ?? "bar");
@@ -283,13 +287,13 @@ function ChartDialog({
     if (!open) return;
 
     const nextSource = chart ? sources.find((item) => item.id === chart.sourceId && item.kind === chart.sourceKind) : sources[0];
-    setTitle(chart?.title ?? "Novo grafico");
+    setTitle(chart?.title ?? t("dashboard.dialog.newChart"));
     setSourceKey(nextSource ? `${nextSource.kind}:${nextSource.id}` : "");
     setType(chart?.type ?? "bar");
     setCategoryColumn(chart?.categoryColumn ?? nextSource?.columns[0] ?? "");
     setMetricColumn(chart?.metricColumn ?? nextSource?.metricColumns[0] ?? nextSource?.columns[0] ?? "");
     setAggregation(chart?.aggregation ?? "count");
-  }, [chart, open, sources]);
+  }, [chart, open, sources, t]);
 
   useEffect(() => {
     if (!source) return;
@@ -323,26 +327,26 @@ function ChartDialog({
 
   return (
     <Dialog
-      description="Configure a fonte e como os dados serao usados no grafico."
+      description={t("dashboard.dialog.description")}
       footer={
         <>
           <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button disabled={!title || !source || !categoryColumn || !metricColumn} onClick={submit} type="button">
-            Salvar
+            {t("common.save")}
           </Button>
         </>
       }
       onOpenChange={onOpenChange}
       open={open}
-      title={chart ? "Editar grafico" : "Adicionar grafico"}
+      title={chart ? t("dashboard.dialog.editTitle") : t("dashboard.dialog.addTitle")}
     >
       <div className="grid gap-4">
-        <Input onChange={(event) => setTitle(event.target.value)} placeholder="Titulo" value={title} />
+        <Input onChange={(event) => setTitle(event.target.value)} placeholder={t("dashboard.dialog.titlePlaceholder")} value={title} />
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2 text-sm font-medium sm:col-span-2">
-            <LabelWithInfo label="Fonte de dados" info="Escolha a origem deste grafico. Pode ser a amostra de um parquet carregado ou o resultado salvo de uma aba SQL." />
+            <LabelWithInfo label={t("dashboard.labels.sourceData")} info={t("dashboard.dialog.sourceInfo")} />
             <Select onChange={(event) => setSourceKey(event.target.value)} value={sourceKey}>
               {sources.map((item) => (
                 <option key={`${item.kind}:${item.id}`} value={`${item.kind}:${item.id}`}>
@@ -352,27 +356,27 @@ function ChartDialog({
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
-            <LabelWithInfo label="Tipo" info="Define a visualizacao: barra para comparacoes, linha para series ordenadas e pizza para participacao por categoria." />
+            <LabelWithInfo label={t("dashboard.labels.type")} info={t("dashboard.dialog.typeInfo")} />
             <Select onChange={(event) => setType(event.target.value as ChartType)} value={type}>
               {chartTypes.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {t(`dashboard.chartTypes.${item}`)}
                 </option>
               ))}
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
-            <LabelWithInfo label="Agregacao" info="Use sem agregacao quando sua query ja retornar uma coluna de categoria e outra de valor prontas para o grafico." />
+            <LabelWithInfo label={t("dashboard.labels.aggregation")} info={t("dashboard.dialog.aggregationInfo")} />
             <Select onChange={(event) => setAggregation(event.target.value as AggregationType)} value={aggregation}>
               {aggregations.map((item) => (
                 <option key={item} value={item}>
-                  {item === "none" ? "sem agregacao" : item}
+                  {t(`dashboard.aggregations.${item}`)}
                 </option>
               ))}
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
-            <LabelWithInfo label="Categoria / eixo X" info="Coluna usada para agrupar os dados. Em barras e linhas aparece no eixo X; em pizza vira o nome das fatias." />
+            <LabelWithInfo label={t("dashboard.labels.category")} info={t("dashboard.dialog.categoryInfo")} />
             <Select disabled={!columns.length} onChange={(event) => setCategoryColumn(event.target.value)} value={categoryColumn}>
               {columns.map((column) => (
                 <option key={column} value={column}>
@@ -382,10 +386,7 @@ function ChartDialog({
             </Select>
           </label>
           <label className="space-y-2 text-sm font-medium">
-            <LabelWithInfo
-              label="Metrica / eixo Y"
-              info="Coluna numerica usada como valor. Com sem agregacao, o grafico usa os valores linha a linha. Com count, qualquer coluna pode ser contada."
-            />
+            <LabelWithInfo label={t("dashboard.labels.metric")} info={t("dashboard.dialog.metricInfo")} />
             <Select disabled={!columns.length} onChange={(event) => setMetricColumn(event.target.value)} value={metricColumn}>
               {(aggregation === "count" ? columns : numericColumns).map((column) => (
                 <option key={column} value={column}>
