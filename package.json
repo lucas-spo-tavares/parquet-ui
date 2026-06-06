@@ -13,7 +13,7 @@
     "infra:plan": "terraform -chdir=infra plan",
     "infra:apply": "terraform -chdir=infra apply",
     "infra:destroy": "terraform -chdir=infra destroy",
-    "deploy": "npm run build && aws s3 sync dist/ s3://$S3_BUCKET --delete && aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths '/*'"
+    "deploy": "./scripts/deploy.sh"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

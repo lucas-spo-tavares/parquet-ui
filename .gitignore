@@ -6,3 +6,7 @@ dist
 !.env.example
 *.local
 *.tsbuildinfo
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
