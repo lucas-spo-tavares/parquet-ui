@@ -12,7 +12,15 @@ import type { DataRow, UploadedParquetFile } from "@/types";
 
 const rowOptions = [100, 500, 1_000, 5_000];
 
-export function PreviewView({ file }: { file?: UploadedParquetFile }) {
+export function PreviewView({
+  file,
+  files,
+  onSelectFile,
+}: {
+  file?: UploadedParquetFile;
+  files: UploadedParquetFile[];
+  onSelectFile: (fileId: string) => void;
+}) {
   const [rowLimit, setRowLimit] = useState(100);
   const [rows, setRows] = useState<DataRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +57,13 @@ export function PreviewView({ file }: { file?: UploadedParquetFile }) {
           <p className="text-sm text-muted-foreground">{rows.length.toLocaleString("pt-BR")} linha(s) visiveis</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Select className="w-[240px]" onChange={(event) => onSelectFile(event.target.value)} value={file.id}>
+            {files.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.sqlAlias} - {item.name}
+              </option>
+            ))}
+          </Select>
           <Select
             className="w-[170px]"
             onChange={(event) => {

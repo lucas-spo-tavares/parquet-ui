@@ -1,18 +1,14 @@
 import {
   BadgeCheck,
-  BarChart3,
   Database,
   Download,
   FileSpreadsheet,
   FolderOpen,
   LayoutDashboard,
-  ShieldCheck,
   TableProperties,
   WifiOff,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Alert } from "./components/ui/alert";
-import { Badge } from "./components/ui/badge";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./components/ui/button";
 import { DashboardView } from "./features/dashboard/DashboardView";
 import { PreviewView } from "./features/preview/PreviewView";
@@ -20,7 +16,7 @@ import { ProfilingView } from "./features/profiling/ProfilingView";
 import { SchemaView } from "./features/schema/SchemaView";
 import { SqlView } from "./features/sql/SqlView";
 import { UploadView } from "./features/upload/UploadView";
-import { registerParquetWithDuckDb } from "./lib/duckdb/client";
+import { syncDuckDbFiles } from "./lib/duckdb/client";
 import type { QueryResult, UploadedParquetFile } from "./types";
 
 type Section = "upload" | "schema" | "preview" | "profiling" | "sql" | "dashboard";
@@ -40,6 +36,31 @@ const navItems: Array<{ id: Section; label: string; icon: typeof FolderOpen }> =
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
 ];
 
+function normalizeSqlAlias(value: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  if (!normalized) return "data1";
+  if (/^[0-9]/.test(normalized)) return `data_${normalized}`;
+  return normalized;
+}
+
+function createUniqueSqlAlias(baseAlias: string, usedAliases: Set<string>) {
+  const base = normalizeSqlAlias(baseAlias);
+  if (!usedAliases.has(base)) return base;
+
+  let index = 2;
+  while (usedAliases.has(`${base}_${index}`)) {
+    index += 1;
+  }
+
+  return `${base}_${index}`;
+}
+
 function App() {
   const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   const [files, setFiles] = useState<UploadedParquetFile[]>([]);
@@ -50,8 +71,13 @@ function App() {
   const [isStandalone, setIsStandalone] = useState(window.matchMedia("(display-mode: standalone)").matches || iosStandalone);
   const [duckDbStatus, setDuckDbStatus] = useState<DuckDbStatus>("idle");
   const [queryResult, setQueryResult] = useState<QueryResult>();
+  const filesRef = useRef<UploadedParquetFile[]>([]);
 
   const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [activeFileId, files]);
+
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -81,19 +107,26 @@ function App() {
   const activateFile = async (file: UploadedParquetFile) => {
     setActiveFileId(file.id);
     setQueryResult(undefined);
+  };
+
+  const handleFileLoaded = async (file: UploadedParquetFile) => {
+    const currentFiles = filesRef.current;
+    const usedAliases = new Set(currentFiles.map((item) => item.sqlAlias));
+    const aliasSeed = `data${currentFiles.length + 1}`;
+    const sqlAlias = createUniqueSqlAlias(aliasSeed, usedAliases);
+    const nextFiles = [{ ...file, sqlAlias }, ...currentFiles];
+
+    setFiles(nextFiles);
+    filesRef.current = nextFiles;
     setDuckDbStatus("registering");
     try {
-      await registerParquetWithDuckDb(file.file);
+      await syncDuckDbFiles(nextFiles);
       setDuckDbStatus("ready");
+      await activateFile(nextFiles[0]);
     } catch (error) {
       console.warn("DuckDB registration failed", error);
       setDuckDbStatus("error");
     }
-  };
-
-  const handleFileLoaded = async (file: UploadedParquetFile) => {
-    setFiles((current) => [file, ...current]);
-    await activateFile(file);
     setActiveSection("schema");
   };
 
@@ -101,6 +134,65 @@ function App() {
     const file = files.find((item) => item.id === fileId);
     if (!file) return;
     void activateFile(file);
+  };
+
+  const handleRenameFileAlias = (fileId: string, alias: string) => {
+    const nextFiles = files.map((file) => {
+      if (file.id !== fileId) return file;
+
+      const usedAliases = new Set(files.filter((item) => item.id !== fileId).map((item) => item.sqlAlias));
+      return {
+        ...file,
+        sqlAlias: createUniqueSqlAlias(alias, usedAliases),
+      };
+    });
+
+    const renamedFile = nextFiles.find((file) => file.id === fileId);
+    if (!renamedFile) return;
+
+    setFiles(nextFiles);
+    filesRef.current = nextFiles;
+    setDuckDbStatus("registering");
+    void (async () => {
+      try {
+        await syncDuckDbFiles(nextFiles);
+        setDuckDbStatus("ready");
+      } catch (error) {
+        console.warn("DuckDB alias update failed", error);
+        setDuckDbStatus("error");
+      }
+    })();
+  };
+
+  const handleRemoveFile = (fileId: string) => {
+    const currentFiles = filesRef.current;
+    const nextFiles = currentFiles.filter((file) => file.id !== fileId);
+    const nextActiveFile = activeFileId === fileId ? nextFiles[0] : nextFiles.find((file) => file.id === activeFileId);
+
+    setFiles(nextFiles);
+    filesRef.current = nextFiles;
+    setQueryResult(undefined);
+    setActiveFileId(nextActiveFile?.id);
+
+    if (!nextFiles.length) {
+      setDuckDbStatus("idle");
+      void syncDuckDbFiles([]);
+      if (activeSection !== "upload") {
+        setActiveSection("upload");
+      }
+      return;
+    }
+
+    setDuckDbStatus("registering");
+    void (async () => {
+      try {
+        await syncDuckDbFiles(nextFiles);
+        setDuckDbStatus("ready");
+      } catch (error) {
+        console.warn("DuckDB file removal failed", error);
+        setDuckDbStatus("error");
+      }
+    })();
   };
 
   const handleInstall = async () => {
@@ -158,12 +250,6 @@ function App() {
           </nav>
 
           <div className="mt-6 space-y-3">
-            <Alert>
-              <div className="flex gap-2">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                <span>Parquet-only. CSV existe apenas como exportacao. Nenhum dado e enviado para servidores.</span>
-              </div>
-            </Alert>
             <Button
               className="w-full"
               disabled={!installPrompt || isStandalone}
@@ -174,18 +260,6 @@ function App() {
               <Download className="h-4 w-4" />
               {isStandalone ? "App instalado" : "Instalar PWA"}
             </Button>
-            {activeFile && (
-              <div className="rounded-md border border-border p-3 text-sm">
-                <p className="truncate font-medium">{activeFile.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {activeFile.schema.rowCount.toLocaleString("pt-BR")} linhas · {activeFile.schema.columns.length} colunas
-                </p>
-                <Badge className="mt-2">
-                  <BarChart3 className="mr-1 h-3 w-3" />
-                  {duckDbStatus === "ready" ? "SQL pronto" : duckDbStatus}
-                </Badge>
-              </div>
-            )}
           </div>
         </aside>
 
@@ -206,13 +280,15 @@ function App() {
               duckDbStatus={duckDbStatus}
               files={files}
               onFileLoaded={handleFileLoaded}
+              onRemoveFile={handleRemoveFile}
+              onRenameFileAlias={handleRenameFileAlias}
               onSelectFile={handleSelectFile}
             />
           )}
-          {activeSection === "schema" && <SchemaView file={activeFile} />}
-          {activeSection === "preview" && <PreviewView file={activeFile} />}
-          {activeSection === "profiling" && <ProfilingView file={activeFile} />}
-          {activeSection === "sql" && <SqlView duckDbStatus={duckDbStatus} file={activeFile} onQueryResult={setQueryResult} />}
+          {activeSection === "schema" && <SchemaView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
+          {activeSection === "preview" && <PreviewView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
+          {activeSection === "profiling" && <ProfilingView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
+          {activeSection === "sql" && <SqlView duckDbStatus={duckDbStatus} file={activeFile} files={files} onQueryResult={setQueryResult} />}
           {activeSection === "dashboard" && <DashboardView file={activeFile} queryResult={queryResult} />}
         </section>
       </div>

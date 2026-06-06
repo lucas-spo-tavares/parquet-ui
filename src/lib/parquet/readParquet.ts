@@ -22,6 +22,7 @@ export async function readParquetFile(file: File): Promise<UploadedParquetFile> 
     id: crypto.randomUUID(),
     file,
     name: file.name,
+    sqlAlias: "",
     size: file.size,
     loadedAt: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date()),
     metadata,

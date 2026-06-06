@@ -1,10 +1,10 @@
-import { AlertTriangle, CheckCircle2, FileUp, HardDrive, Loader2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileUp, HardDrive, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { LARGE_FILE_SIZE_MB } from "@/app/constants";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatBytes } from "@/lib/formatters/formatters";
 import { readParquetFile } from "@/lib/parquet/readParquet";
 import type { UploadedParquetFile } from "@/types";
@@ -14,6 +14,8 @@ type UploadViewProps = {
   activeFile?: UploadedParquetFile;
   duckDbStatus: "idle" | "registering" | "ready" | "error";
   onFileLoaded: (file: UploadedParquetFile) => Promise<void>;
+  onRemoveFile: (fileId: string) => void;
+  onRenameFileAlias: (fileId: string, alias: string) => void;
   onSelectFile: (fileId: string) => void;
 };
 
@@ -28,11 +30,12 @@ function truncateFileName(name: string) {
   return name.length > 30 ? `${name.slice(0, 30)}...` : name;
 }
 
-export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onSelectFile }: UploadViewProps) {
+export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onRemoveFile, onRenameFileAlias, onSelectFile }: UploadViewProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [warning, setWarning] = useState(browserSupportMessage());
+  const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList?.length) return;
@@ -66,7 +69,7 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onSe
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1.45fr_0.9fr]">
+    <div className="grid gap-4 xl:grid-cols-2">
       <div className="space-y-4">
         {warning && (
           <Alert className="border-amber-200 bg-amber-50 text-amber-950">
@@ -121,23 +124,16 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onSe
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              Privacidade
-            </CardTitle>
-            <CardDescription>Hospedagem estatica, processamento local.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm leading-6 text-muted-foreground">
-            Os arquivos Parquet nao saem do seu navegador. A AWS entrega apenas HTML, CSS, JS, WASM e assets estaticos.
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
               <HardDrive className="h-5 w-5" />
               Arquivos da sessao
             </CardTitle>
-            <CardDescription>{files.length ? `${files.length} arquivo(s) carregado(s)` : "Estado vazio"}</CardDescription>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>{files.length ? `${files.length} arquivo(s) carregado(s)` : "Estado vazio"}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                SPA local. Os arquivos Parquet nao saem do navegador.
+              </span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {!files.length ? (
@@ -145,35 +141,72 @@ export function UploadView({ files, activeFile, duckDbStatus, onFileLoaded, onSe
                 Nenhum Parquet carregado ainda. Apos selecionar um arquivo, schema, preview, profiling, SQL e dashboard ficam ativos.
               </div>
             ) : (
-              files.map((file) => (
-                <button
-                  className={`w-full rounded-md border p-3 text-left transition ${
-                    activeFile?.id === file.id ? "border-primary bg-muted" : "border-border hover:bg-muted"
-                  }`}
-                  key={file.id}
-                  onClick={() => onSelectFile(file.id)}
-                  type="button"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium" title={file.name}>
-                        {truncateFileName(file.name)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatBytes(file.size)} · {file.loadedAt}
-                      </p>
+              files.map((file) => {
+                const aliasValue = aliasDrafts[file.id] ?? file.sqlAlias;
+                const isActive = activeFile?.id === file.id;
+
+                return (
+                  <div className={`rounded-md border p-3 transition ${isActive ? "border-primary bg-muted" : "border-border"}`} key={file.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <button className="min-w-0 flex-1 text-left" onClick={() => onSelectFile(file.id)} type="button">
+                        <p className="text-sm font-medium" title={file.name}>
+                          {truncateFileName(file.name)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatBytes(file.size)} · {file.loadedAt}
+                        </p>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {isActive && <Badge>ativo</Badge>}
+                        <Button
+                          aria-label={`Remover ${file.name} da sessao`}
+                          onClick={() => onRemoveFile(file.id)}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    {activeFile?.id === file.id && <Badge>ativo</Badge>}
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Alias SQL</span>
+                      <input
+                        className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                        onBlur={() => {
+                          onRenameFileAlias(file.id, aliasValue);
+                          setAliasDrafts((current) => {
+                            const next = { ...current };
+                            delete next[file.id];
+                            return next;
+                          });
+                        }}
+                        onChange={(event) =>
+                          setAliasDrafts((current) => ({
+                            ...current,
+                            [file.id]: event.target.value,
+                          }))
+                        }
+                        spellCheck={false}
+                        type="text"
+                        value={aliasValue}
+                      />
+                    </div>
                   </div>
-                </button>
-              ))
+                );
+              })
             )}
-            {duckDbStatus === "registering" && <Badge>Registrando tabela data no DuckDB...</Badge>}
+            {duckDbStatus === "registering" && <Badge>Registrando aliases SQL no DuckDB...</Badge>}
             {duckDbStatus === "ready" && (
               <Badge className="bg-emerald-50 text-emerald-700">
                 <CheckCircle2 className="mr-1 h-3 w-3" />
                 DuckDB pronto
               </Badge>
+            )}
+            {!!files.length && (
+              <div className="text-xs leading-5 text-muted-foreground">
+                Use os aliases nas queries, por exemplo: <code>SELECT * FROM data1</code> ou <code>SELECT * FROM data1 JOIN data2 ...</code>.
+              </div>
             )}
           </CardContent>
         </Card>

@@ -13,7 +13,15 @@ import type { ColumnType, UploadedParquetFile } from "@/types";
 
 const columnTypes: Array<ColumnType | "all"> = ["all", "string", "number", "integer", "boolean", "date", "timestamp", "decimal", "unknown"];
 
-export function ProfilingView({ file }: { file?: UploadedParquetFile }) {
+export function ProfilingView({
+  file,
+  files,
+  onSelectFile,
+}: {
+  file?: UploadedParquetFile;
+  files: UploadedParquetFile[];
+  onSelectFile: (fileId: string) => void;
+}) {
   const [search, setSearch] = useState("");
   const [type, setType] = useState<ColumnType | "all">("all");
   const profile = useMemo(() => (file ? buildProfile(file.sampleRows, file.schema) : undefined), [file]);
@@ -40,7 +48,7 @@ export function ProfilingView({ file }: { file?: UploadedParquetFile }) {
         <Stat label="Modo" value={profile.isSampled ? "Amostra" : "Completo"} />
       </div>
       <Alert>O profiling inicial usa a amostra carregada do Parquet. Arquivos pequenos podem ser analisados por inteiro.</Alert>
-      <div className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+      <div className="grid gap-3 md:grid-cols-[1fr_220px_240px_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input className="pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar coluna..." value={search} />
@@ -49,6 +57,13 @@ export function ProfilingView({ file }: { file?: UploadedParquetFile }) {
           {columnTypes.map((columnType) => (
             <option key={columnType} value={columnType}>
               {columnType === "all" ? "Todos os tipos" : columnType}
+            </option>
+          ))}
+        </Select>
+        <Select onChange={(event) => onSelectFile(event.target.value)} value={file.id}>
+          {files.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.sqlAlias} - {item.name}
             </option>
           ))}
         </Select>

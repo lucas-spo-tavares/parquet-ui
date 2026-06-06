@@ -9,12 +9,14 @@ import { displayValue, formatPercent } from "@/lib/formatters/formatters";
 import type { ColumnType, UploadedParquetFile } from "@/types";
 
 type SchemaViewProps = {
+  files: UploadedParquetFile[];
   file?: UploadedParquetFile;
+  onSelectFile: (fileId: string) => void;
 };
 
 const columnTypes: Array<ColumnType | "all"> = ["all", "string", "number", "integer", "boolean", "date", "timestamp", "decimal", "unknown"];
 
-export function SchemaView({ file }: SchemaViewProps) {
+export function SchemaView({ files, file, onSelectFile }: SchemaViewProps) {
   const [search, setSearch] = useState("");
   const [type, setType] = useState<ColumnType | "all">("all");
 
@@ -41,7 +43,7 @@ export function SchemaView({ file }: SchemaViewProps) {
         <StatCard label="Amostra analisada" value={file.sampleRows.length.toLocaleString("pt-BR")} />
       </div>
       <Alert>Null count, percentual de nulos e exemplos sao estimados com base na amostra inicial.</Alert>
-      <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+      <div className="grid gap-3 md:grid-cols-[1fr_220px_240px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input className="pl-9" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar coluna..." value={search} />
@@ -50,6 +52,13 @@ export function SchemaView({ file }: SchemaViewProps) {
           {columnTypes.map((columnType) => (
             <option key={columnType} value={columnType}>
               {columnType === "all" ? "Todos os tipos" : columnType}
+            </option>
+          ))}
+        </Select>
+        <Select onChange={(event) => onSelectFile(event.target.value)} value={file.id}>
+          {files.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.sqlAlias} - {item.name}
             </option>
           ))}
         </Select>

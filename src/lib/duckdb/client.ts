@@ -4,7 +4,7 @@ import mvpWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url
 import ehWasm from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
 import mvpWasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
 import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
-import type { DataRow, QueryResult } from "@/types";
+import type { DataRow, QueryResult, UploadedParquetFile } from "@/types";
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
@@ -18,7 +18,7 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
 };
 
 let dbPromise: Promise<duckdb.AsyncDuckDB> | null = null;
-let registeredParquetPath: string | undefined;
+const registeredParquetFiles = new Map<string, { alias: string; parquetPath: string }>();
 
 async function getDb() {
   if (dbPromise) return dbPromise;
@@ -74,29 +74,44 @@ function sqlString(value: string) {
   return value.replace(/'/g, "''");
 }
 
-export async function registerParquetWithDuckDb(file: File) {
+async function registerBrowserFile(db: duckdb.AsyncDuckDB, parquetPath: string, file: File) {
+  try {
+    await db.registerFileHandle(parquetPath, file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true);
+  } catch {
+    await db.registerFileBuffer(parquetPath, new Uint8Array(await file.arrayBuffer()));
+  }
+}
+
+export async function syncDuckDbFiles(files: UploadedParquetFile[]) {
   const db = await getDb();
   const conn = await db.connect();
-  const previousParquetPath = registeredParquetPath;
-  const parquetPath = createVirtualParquetPath();
+  const nextFileIds = new Set(files.map((file) => file.id));
 
   try {
-    await conn.query("DROP VIEW IF EXISTS data");
-    await conn.query("DROP TABLE IF EXISTS data");
-
-    try {
-      await db.registerFileHandle(parquetPath, file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true);
-    } catch {
-      await db.registerFileBuffer(parquetPath, new Uint8Array(await file.arrayBuffer()));
+    for (const [fileId, registered] of registeredParquetFiles) {
+      if (nextFileIds.has(fileId)) continue;
+      await conn.query(`DROP VIEW IF EXISTS ${registered.alias}`);
+      await conn.query(`DROP TABLE IF EXISTS ${registered.alias}`);
+      await db.dropFile(registered.parquetPath).catch(() => undefined);
+      registeredParquetFiles.delete(fileId);
     }
 
-    await conn.query(`CREATE OR REPLACE VIEW data AS SELECT * FROM read_parquet('${sqlString(parquetPath)}')`);
-    registeredParquetPath = parquetPath;
+    for (const file of files) {
+      const registered = registeredParquetFiles.get(file.id);
+      const parquetPath = registered?.parquetPath ?? createVirtualParquetPath();
 
-    if (previousParquetPath && previousParquetPath !== parquetPath) {
-      await db.dropFile(previousParquetPath).catch(() => undefined);
+      if (!registered) {
+        await registerBrowserFile(db, parquetPath, file.file);
+      }
+
+      if (registered && registered.alias !== file.sqlAlias) {
+        await conn.query(`DROP VIEW IF EXISTS ${registered.alias}`);
+        await conn.query(`DROP TABLE IF EXISTS ${registered.alias}`);
+      }
+
+      await conn.query(`CREATE OR REPLACE VIEW ${file.sqlAlias} AS SELECT * FROM read_parquet('${sqlString(parquetPath)}')`);
+      registeredParquetFiles.set(file.id, { alias: file.sqlAlias, parquetPath });
     }
-    await db.dropFile("uploaded.parquet").catch(() => undefined);
   } finally {
     await conn.close();
   }

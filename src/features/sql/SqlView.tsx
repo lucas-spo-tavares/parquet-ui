@@ -1,5 +1,5 @@
 import { Download, Loader2, Play, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -9,28 +9,34 @@ import { downloadCsv } from "@/lib/export/csv";
 import { runDuckDbQuery } from "@/lib/duckdb/client";
 import type { QueryError, QueryResult, UploadedParquetFile } from "@/types";
 
-const INITIAL_SQL = `SELECT *
-FROM data
-LIMIT 100;`;
-
-const suggestions = [
-  INITIAL_SQL,
-  `DESCRIBE data;`,
-  `SELECT COUNT(*) AS total_rows
-FROM data;`,
-];
-
 type SqlViewProps = {
   file?: UploadedParquetFile;
+  files: UploadedParquetFile[];
   duckDbStatus: "idle" | "registering" | "ready" | "error";
   onQueryResult: (result: QueryResult | undefined) => void;
 };
 
-export function SqlView({ file, duckDbStatus, onQueryResult }: SqlViewProps) {
-  const [sql, setSql] = useState(INITIAL_SQL);
+export function SqlView({ file, files, duckDbStatus, onQueryResult }: SqlViewProps) {
+  const primaryAlias = files[0]?.sqlAlias ?? "data1";
+  const suggestions = useMemo(
+    () => [
+      `SELECT *
+FROM ${primaryAlias}
+LIMIT 100;`,
+      `DESCRIBE ${primaryAlias};`,
+      `SELECT COUNT(*) AS total_rows
+FROM ${primaryAlias};`,
+    ],
+    [primaryAlias],
+  );
+  const [sql, setSql] = useState(suggestions[0]);
   const [result, setResult] = useState<QueryResult>();
   const [queryError, setQueryError] = useState<QueryError>();
   const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    setSql((current) => (current.trim() ? current : suggestions[0]));
+  }, [suggestions]);
 
   const canRun = Boolean(file) && duckDbStatus === "ready" && !running;
 
@@ -53,7 +59,7 @@ export function SqlView({ file, duckDbStatus, onQueryResult }: SqlViewProps) {
   };
 
   if (!file) {
-    return <Empty title="SQL" message="Carregue um arquivo .parquet para consultar a tabela local data." />;
+    return <Empty title="SQL" message="Carregue um arquivo .parquet para consultar os aliases SQL gerados para cada arquivo." />;
   }
 
   return (
@@ -95,8 +101,13 @@ export function SqlView({ file, duckDbStatus, onQueryResult }: SqlViewProps) {
               </button>
             ))}
           </div>
-          {duckDbStatus === "registering" && <Alert>Registrando o arquivo Parquet como tabela data no DuckDB-WASM...</Alert>}
+          {duckDbStatus === "registering" && <Alert>Registrando aliases dos arquivos Parquet no DuckDB-WASM...</Alert>}
           {duckDbStatus === "error" && <Alert className="border-destructive/30 bg-red-50 text-red-950">Nao foi possivel inicializar DuckDB-WASM para este arquivo.</Alert>}
+          {!!files.length && (
+            <Alert>
+              Alias disponiveis: {files.map((item) => item.sqlAlias).join(", ")}. Use esses nomes diretamente nas queries e joins entre Parquets.
+            </Alert>
+          )}
           <Alert>Queries rodam no navegador via DuckDB-WASM. Nenhum dado e enviado para backend.</Alert>
         </CardContent>
       </Card>

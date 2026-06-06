@@ -36,6 +36,7 @@ export type UploadedParquetFile = {
   id: string;
   file: File;
   name: string;
+  sqlAlias: string;
   size: number;
   loadedAt: string;
   metadata: FileMetaData;
