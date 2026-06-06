@@ -15,10 +15,11 @@ import { DashboardView } from "./features/dashboard/DashboardView";
 import { PreviewView } from "./features/preview/PreviewView";
 import { ProfilingView } from "./features/profiling/ProfilingView";
 import { SchemaView } from "./features/schema/SchemaView";
+import { useSqlStore } from "./features/sql/store/sqlStore";
 import { SqlView } from "./features/sql/SqlView";
 import { UploadView } from "./features/upload/UploadView";
 import { syncDuckDbFiles } from "./lib/duckdb/client";
-import type { QueryResult, UploadedParquetFile } from "./types";
+import type { UploadedParquetFile } from "./types";
 
 type Section = "upload" | "schema" | "preview" | "profiling" | "sql" | "dashboard";
 type DuckDbStatus = "idle" | "registering" | "ready" | "error";
@@ -71,8 +72,8 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(window.matchMedia("(display-mode: standalone)").matches || iosStandalone);
   const [duckDbStatus, setDuckDbStatus] = useState<DuckDbStatus>("idle");
-  const [queryResult, setQueryResult] = useState<QueryResult>();
   const filesRef = useRef<UploadedParquetFile[]>([]);
+  const activeQueryResult = useSqlStore((state) => state.tabs.find((tab) => tab.id === state.activeTabId)?.result);
 
   const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [activeFileId, files]);
 
@@ -107,7 +108,6 @@ function App() {
 
   const activateFile = async (file: UploadedParquetFile) => {
     setActiveFileId(file.id);
-    setQueryResult(undefined);
   };
 
   const handleFileLoaded = async (file: UploadedParquetFile) => {
@@ -172,7 +172,6 @@ function App() {
 
     setFiles(nextFiles);
     filesRef.current = nextFiles;
-    setQueryResult(undefined);
     setActiveFileId(nextActiveFile?.id);
 
     if (!nextFiles.length) {
@@ -302,8 +301,8 @@ function App() {
           {activeSection === "schema" && <SchemaView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
           {activeSection === "preview" && <PreviewView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
           {activeSection === "profiling" && <ProfilingView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
-          {activeSection === "sql" && <SqlView duckDbStatus={duckDbStatus} file={activeFile} files={files} onQueryResult={setQueryResult} />}
-          {activeSection === "dashboard" && <DashboardView file={activeFile} queryResult={queryResult} />}
+          {activeSection === "sql" && <SqlView duckDbStatus={duckDbStatus} file={activeFile} files={files} />}
+          {activeSection === "dashboard" && <DashboardView file={activeFile} queryResult={activeQueryResult} />}
         </section>
       </div>
     </main>
