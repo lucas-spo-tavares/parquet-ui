@@ -1,13 +1,13 @@
 import { AlertTriangle, CheckCircle2, FileUp, HardDrive, Loader2, ShieldCheck } from "lucide-react";
 import { useRef, useState } from "react";
-import { LARGE_FILE_SIZE_MB } from "../../app/constants";
-import { Alert } from "../../components/ui/alert";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { formatBytes } from "../../lib/formatters/formatters";
-import { readParquetFile } from "../../lib/parquet/readParquet";
-import type { UploadedParquetFile } from "../../types";
+import { LARGE_FILE_SIZE_MB } from "@/app/constants";
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatBytes } from "@/lib/formatters/formatters";
+import { readParquetFile } from "@/lib/parquet/readParquet";
+import type { UploadedParquetFile } from "@/types";
 
 type UploadViewProps = {
   files: UploadedParquetFile[];

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChartConfig } from "../../../types";
+import type { ChartConfig } from "@/types";
 
 type DashboardStore = {
   chartsByFileId: Record<string, ChartConfig[]>;

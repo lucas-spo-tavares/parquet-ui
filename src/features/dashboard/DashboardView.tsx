@@ -15,15 +15,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Alert } from "../../components/ui/alert";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Dialog } from "../../components/ui/dialog";
-import { Input } from "../../components/ui/input";
-import { Select } from "../../components/ui/select";
-import { aggregateChartData } from "../../lib/charts/aggregate";
-import { downloadCsv } from "../../lib/export/csv";
-import type { AggregationType, ChartConfig, ChartType, QueryResult, UploadedParquetFile } from "../../types";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { aggregateChartData } from "@/lib/charts/aggregate";
+import { downloadCsv } from "@/lib/export/csv";
+import type { AggregationType, ChartConfig, ChartType, QueryResult, UploadedParquetFile } from "@/types";
 import { useDashboardStore } from "./store/dashboardStore";
 
 const colors = ["#09090b", "#0f766e", "#2563eb", "#a16207", "#be123c", "#6d28d9", "#047857", "#b45309", "#64748b"];

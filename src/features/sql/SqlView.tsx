@@ -1,13 +1,13 @@
 import { Download, Loader2, Play, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { MAX_QUERY_RESULT_ROWS } from "../../app/constants";
-import { Alert } from "../../components/ui/alert";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { DataTable } from "../../components/ui/data-table";
-import { downloadCsv } from "../../lib/export/csv";
-import { runDuckDbQuery } from "../../lib/duckdb/client";
-import type { QueryError, QueryResult, UploadedParquetFile } from "../../types";
+import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { downloadCsv } from "@/lib/export/csv";
+import { runDuckDbQuery } from "@/lib/duckdb/client";
+import type { QueryError, QueryResult, UploadedParquetFile } from "@/types";
 
 const INITIAL_SQL = `SELECT *
 FROM data

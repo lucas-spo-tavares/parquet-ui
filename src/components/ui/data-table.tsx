@@ -10,8 +10,8 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { DataRow } from "../../types";
-import { displayValue } from "../../lib/formatters/formatters";
+import { displayValue } from "@/lib/formatters/formatters";
+import type { DataRow } from "@/types";
 import { Button } from "./button";
 import { Input } from "./input";
 

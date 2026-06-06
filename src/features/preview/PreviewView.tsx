@@ -1,14 +1,14 @@
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MAX_PREVIEW_ROWS } from "../../app/constants";
-import { Alert } from "../../components/ui/alert";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { DataTable } from "../../components/ui/data-table";
-import { Select } from "../../components/ui/select";
-import { downloadCsv } from "../../lib/export/csv";
-import { readParquetPreview } from "../../lib/parquet/readParquet";
-import type { DataRow, UploadedParquetFile } from "../../types";
+import { MAX_PREVIEW_ROWS } from "@/app/constants";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { Select } from "@/components/ui/select";
+import { downloadCsv } from "@/lib/export/csv";
+import { readParquetPreview } from "@/lib/parquet/readParquet";
+import type { DataRow, UploadedParquetFile } from "@/types";
 
 const rowOptions = [100, 500, 1_000, 5_000];
 

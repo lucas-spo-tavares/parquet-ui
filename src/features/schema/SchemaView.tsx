@@ -1,12 +1,12 @@
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Alert } from "../../components/ui/alert";
-import { Badge } from "../../components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
-import { Select } from "../../components/ui/select";
-import { displayValue, formatPercent } from "../../lib/formatters/formatters";
-import type { ColumnType, UploadedParquetFile } from "../../types";
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { displayValue, formatPercent } from "@/lib/formatters/formatters";
+import type { ColumnType, UploadedParquetFile } from "@/types";
 
 type SchemaViewProps = {
   file?: UploadedParquetFile;

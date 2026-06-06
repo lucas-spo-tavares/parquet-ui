@@ -1,4 +1,4 @@
-import type { DataValue } from "../../types";
+import type { DataValue } from "@/types";
 
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;

@@ -3,8 +3,8 @@ import ehWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url";
 import mvpWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url";
 import ehWasm from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
 import mvpWasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
-import { MAX_QUERY_RESULT_ROWS } from "../../app/constants";
-import type { DataRow, QueryResult } from "../../types";
+import { MAX_QUERY_RESULT_ROWS } from "@/app/constants";
+import type { DataRow, QueryResult } from "@/types";
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {

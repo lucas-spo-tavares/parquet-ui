@@ -1,6 +1,6 @@
-import { MAX_PIE_CATEGORIES } from "../../app/constants";
-import type { AggregatedChartRow, ChartConfig, DataRow } from "../../types";
-import { asNumber, displayValue } from "../formatters/formatters";
+import { MAX_PIE_CATEGORIES } from "@/app/constants";
+import { asNumber, displayValue } from "@/lib/formatters/formatters";
+import type { AggregatedChartRow, ChartConfig, DataRow } from "@/types";
 
 function sortCategories(rows: AggregatedChartRow[]) {
   return rows.sort((a, b) => {

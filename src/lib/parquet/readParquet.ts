@@ -1,6 +1,6 @@
 import { parquetMetadataAsync, parquetReadObjects } from "hyparquet";
-import { DEFAULT_SAMPLE_SIZE, INITIAL_PREVIEW_ROWS, LARGE_FILE_SIZE_MB } from "../../app/constants";
-import type { DataRow, UploadedParquetFile } from "../../types";
+import { DEFAULT_SAMPLE_SIZE, INITIAL_PREVIEW_ROWS, LARGE_FILE_SIZE_MB } from "@/app/constants";
+import type { DataRow, UploadedParquetFile } from "@/types";
 import { asyncBufferFromBrowserFile } from "./browserFile";
 import { buildTableSchema } from "./schema";
 

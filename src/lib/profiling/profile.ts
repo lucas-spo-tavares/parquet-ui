@@ -1,5 +1,5 @@
-import type { ColumnProfile, ColumnType, DataRow, ProfileResult, TableSchema } from "../../types";
-import { asNumber, displayValue } from "../formatters/formatters";
+import { asNumber, displayValue } from "@/lib/formatters/formatters";
+import type { ColumnProfile, ColumnType, DataRow, ProfileResult, TableSchema } from "@/types";
 
 function median(values: number[]) {
   if (!values.length) return undefined;

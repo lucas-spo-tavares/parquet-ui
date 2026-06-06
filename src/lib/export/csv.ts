@@ -1,5 +1,5 @@
-import type { DataRow } from "../../types";
-import { displayValue } from "../formatters/formatters";
+import { displayValue } from "@/lib/formatters/formatters";
+import type { DataRow } from "@/types";
 
 export function rowsToCsv(rows: DataRow[], columns?: string[]) {
   const headers = columns ?? Array.from(new Set(rows.flatMap((row) => Object.keys(row))));

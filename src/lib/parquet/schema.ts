@@ -1,6 +1,6 @@
 import type { FileMetaData, SchemaElement, SchemaTree } from "hyparquet";
 import { parquetSchema } from "hyparquet";
-import type { ColumnSchema, ColumnType, DataRow } from "../../types";
+import type { ColumnSchema, ColumnType, DataRow } from "@/types";
 
 function logicalTypeToString(logicalType: SchemaElement["logical_type"]) {
   if (!logicalType) return undefined;

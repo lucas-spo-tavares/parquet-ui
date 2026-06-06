@@ -1,5 +1,5 @@
 import { type SelectHTMLAttributes, forwardRef } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(({ className, children, ...props }, ref) => (
   <select
