@@ -8,21 +8,18 @@ import {
   TableProperties,
   WifiOff,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { Select } from "./components/ui/select";
-import { DashboardView } from "./features/dashboard/DashboardView";
 import { useDashboardStore } from "./features/dashboard/store/dashboardStore";
 import { PreviewView } from "./features/preview/PreviewView";
 import { ProfilingView } from "./features/profiling/ProfilingView";
 import { SchemaView } from "./features/schema/SchemaView";
 import { useSqlStore } from "./features/sql/store/sqlStore";
-import { SqlView } from "./features/sql/SqlView";
 import { UploadView } from "./features/upload/UploadView";
 import { languageOptions, type AppLanguage } from "./i18n";
-import { syncDuckDbFiles } from "./lib/duckdb/client";
 import type { UploadedParquetFile } from "./types";
 
 type Section = "upload" | "schema" | "preview" | "profiling" | "sql" | "dashboard";
@@ -32,6 +29,11 @@ type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
+
+const SqlView = lazy(() => import("./features/sql/SqlView").then((module) => ({ default: module.SqlView })));
+const DashboardView = lazy(() =>
+  import("./features/dashboard/DashboardView").then((module) => ({ default: module.DashboardView })),
+);
 
 function normalizeSqlAlias(value: string) {
   const normalized = value
@@ -56,6 +58,19 @@ function createUniqueSqlAlias(baseAlias: string, usedAliases: Set<string>) {
   }
 
   return `${base}_${index}`;
+}
+
+async function syncDuckDbFiles(files: UploadedParquetFile[]) {
+  const duckDbClient = await import("./lib/duckdb/client");
+  return duckDbClient.syncDuckDbFiles(files);
+}
+
+function SectionLoadingFallback({ label }: { label: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+      {label}
+    </div>
+  );
 }
 
 function App() {
@@ -342,8 +357,16 @@ function App() {
           {activeSection === "schema" && <SchemaView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
           {activeSection === "preview" && <PreviewView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
           {activeSection === "profiling" && <ProfilingView file={activeFile} files={files} onSelectFile={handleSelectFile} />}
-          {activeSection === "sql" && <SqlView duckDbStatus={duckDbStatus} file={activeFile} files={files} />}
-          {activeSection === "dashboard" && <DashboardView files={files} />}
+          {activeSection === "sql" && (
+            <Suspense fallback={<SectionLoadingFallback label={t("sql.editorLoading")} />}>
+              <SqlView duckDbStatus={duckDbStatus} file={activeFile} files={files} />
+            </Suspense>
+          )}
+          {activeSection === "dashboard" && (
+            <Suspense fallback={<SectionLoadingFallback label={t("dashboard.subtitle")} />}>
+              <DashboardView files={files} />
+            </Suspense>
+          )}
         </section>
       </div>
     </main>
